@@ -1,45 +1,249 @@
-import { ScrollView, Text, View, TouchableOpacity } from "react-native";
-
+import { ScrollView, Text, View, TouchableOpacity, Pressable } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { useColors } from "@/hooks/use-colors";
+import { useState, useEffect } from "react";
+import * as Haptics from "expo-haptics";
 
-/**
- * Home Screen - NativeWind Example
- *
- * This template uses NativeWind (Tailwind CSS for React Native).
- * You can use familiar Tailwind classes directly in className props.
- *
- * Key patterns:
- * - Use `className` instead of `style` for most styling
- * - Theme colors: use tokens directly (bg-background, text-foreground, bg-primary, etc.); no dark: prefix needed
- * - Responsive: standard Tailwind breakpoints work on web
- * - Custom colors defined in tailwind.config.js
- */
+interface WorkSession {
+  id: string;
+  startTime: Date;
+  endTime?: Date;
+  breaks: Array<{ start: Date; end?: Date }>;
+  totalBreakTime: number;
+  status: "active" | "paused" | "completed";
+}
+
 export default function HomeScreen() {
+  const colors = useColors();
+  const [workStatus, setWorkStatus] = useState<"idle" | "working" | "break">("idle");
+  const [elapsedTime, setElapsedTime] = useState(0); // в секундах
+  const [currentSession, setCurrentSession] = useState<WorkSession | null>(null);
+  const [todayWorkTime, setTodayWorkTime] = useState(8.5); // в часах
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | undefined;
+
+    if (workStatus !== "idle") {
+      interval = setInterval(() => {
+        setElapsedTime((prev) => prev + 1);
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [workStatus]);
+
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  };
+
+  const handleStartWork = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setWorkStatus("working");
+    setElapsedTime(0);
+    setCurrentSession({
+      id: Date.now().toString(),
+      startTime: new Date(),
+      breaks: [],
+      totalBreakTime: 0,
+      status: "active",
+    });
+  };
+
+  const handleEndWork = async () => {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setWorkStatus("idle");
+    if (currentSession) {
+      setCurrentSession({
+        ...currentSession,
+        endTime: new Date(),
+        status: "completed",
+      });
+    }
+    // Здесь должна быть логика сохранения сессии
+  };
+
+  const handleStartBreak = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setWorkStatus("break");
+    setElapsedTime(0);
+  };
+
+  const handleEndBreak = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setWorkStatus("working");
+    setElapsedTime(0);
+  };
+
+  const getStatusText = () => {
+    switch (workStatus) {
+      case "idle":
+        return "Не на работе";
+      case "working":
+        return "На работе";
+      case "break":
+        return "На перерыве";
+      default:
+        return "Неизвестно";
+    }
+  };
+
+  const getStatusColor = () => {
+    switch (workStatus) {
+      case "idle":
+        return colors.muted;
+      case "working":
+        return colors.success;
+      case "break":
+        return colors.warning;
+      default:
+        return colors.muted;
+    }
+  };
+
   return (
-    <ScreenContainer className="p-6">
+    <ScreenContainer className="p-4">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <View className="flex-1 gap-8">
-          {/* Hero Section */}
+        <View className="flex-1 gap-6">
+          {/* Статус */}
           <View className="items-center gap-2">
-            <Text className="text-4xl font-bold text-foreground">Welcome</Text>
-            <Text className="text-base text-muted text-center">
-              Edit app/(tabs)/index.tsx to get started
-            </Text>
+            <Text className="text-4xl font-bold text-foreground">Worktime</Text>
+            <View
+              className="px-4 py-2 rounded-full"
+              style={{ backgroundColor: getStatusColor() + "20" }}
+            >
+              <Text className="text-lg font-semibold" style={{ color: getStatusColor() }}>
+                {getStatusText()}
+              </Text>
+            </View>
           </View>
 
-          {/* Example Card */}
-          <View className="w-full max-w-sm self-center bg-surface rounded-2xl p-6 shadow-sm border border-border">
-            <Text className="text-lg font-semibold text-foreground mb-2">NativeWind Ready</Text>
-            <Text className="text-sm text-muted leading-relaxed">
-              Use Tailwind CSS classes directly in your React Native components.
-            </Text>
-          </View>
-
-          {/* Example Button */}
+          {/* Таймер */}
           <View className="items-center">
-            <TouchableOpacity className="bg-primary px-6 py-3 rounded-full active:opacity-80">
-              <Text className="text-background font-semibold">Get Started</Text>
-            </TouchableOpacity>
+            <Text className="text-6xl font-bold text-foreground font-mono">
+              {formatTime(elapsedTime)}
+            </Text>
+            <Text className="text-sm text-muted mt-2">
+              {workStatus === "working" && "Время на работе"}
+              {workStatus === "break" && "Время перерыва"}
+              {workStatus === "idle" && "Рабочий день не начат"}
+            </Text>
+          </View>
+
+          {/* Информация о дне */}
+          <View className="bg-surface rounded-lg p-4 border border-border">
+            <View className="flex-row justify-between items-center mb-3">
+              <Text className="text-sm font-semibold text-muted">Сегодня отработано</Text>
+              <Text className="text-2xl font-bold text-foreground">{todayWorkTime.toFixed(1)} ч</Text>
+            </View>
+            <View className="w-full h-2 bg-border rounded-full overflow-hidden">
+              <View
+                className="h-full rounded-full"
+                style={{
+                  width: `${(todayWorkTime / 8) * 100}%`,
+                  backgroundColor: colors.primary,
+                }}
+              />
+            </View>
+            <Text className="text-xs text-muted mt-2">Норма: 8 часов</Text>
+          </View>
+
+          {/* Кнопки действий */}
+          <View className="gap-3">
+            {workStatus === "idle" ? (
+              <Pressable
+                onPress={handleStartWork}
+                style={({ pressed }) => [
+                  {
+                    backgroundColor: colors.success,
+                    opacity: pressed ? 0.8 : 1,
+                    transform: [{ scale: pressed ? 0.97 : 1 }],
+                  },
+                ]}
+                className="py-4 rounded-lg items-center justify-center"
+              >
+                <Text className="text-lg font-bold text-white">Начать работу</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={handleEndWork}
+                style={({ pressed }) => [
+                  {
+                    backgroundColor: colors.error,
+                    opacity: pressed ? 0.8 : 1,
+                    transform: [{ scale: pressed ? 0.97 : 1 }],
+                  },
+                ]}
+                className="py-4 rounded-lg items-center justify-center"
+              >
+                <Text className="text-lg font-bold text-white">Завершить работу</Text>
+              </Pressable>
+            )}
+
+            {workStatus === "working" ? (
+              <Pressable
+                onPress={handleStartBreak}
+                style={({ pressed }) => [
+                  {
+                    backgroundColor: colors.warning,
+                    opacity: pressed ? 0.8 : 1,
+                    transform: [{ scale: pressed ? 0.97 : 1 }],
+                  },
+                ]}
+                className="py-4 rounded-lg items-center justify-center"
+              >
+                <Text className="text-lg font-bold text-white">Начать перерыв</Text>
+              </Pressable>
+            ) : workStatus === "break" ? (
+              <Pressable
+                onPress={handleEndBreak}
+                style={({ pressed }) => [
+                  {
+                    backgroundColor: colors.warning,
+                    opacity: pressed ? 0.8 : 1,
+                    transform: [{ scale: pressed ? 0.97 : 1 }],
+                  },
+                ]}
+                className="py-4 rounded-lg items-center justify-center"
+              >
+                <Text className="text-lg font-bold text-white">Завершить перерыв</Text>
+              </Pressable>
+            ) : null}
+
+            <Pressable
+              style={({ pressed }) => [
+                {
+                  backgroundColor: colors.primary,
+                  opacity: pressed ? 0.8 : 1,
+                  transform: [{ scale: pressed ? 0.97 : 1 }],
+                },
+              ]}
+              className="py-4 rounded-lg items-center justify-center"
+            >
+              <Text className="text-lg font-bold text-white">Мои задачи</Text>
+            </Pressable>
+          </View>
+
+          {/* Быстрая информация */}
+          <View className="gap-2">
+            <View className="flex-row gap-2">
+              <View className="flex-1 bg-surface rounded-lg p-3 border border-border">
+                <Text className="text-xs text-muted">Перерывов</Text>
+                <Text className="text-xl font-bold text-foreground mt-1">2</Text>
+              </View>
+              <View className="flex-1 bg-surface rounded-lg p-3 border border-border">
+                <Text className="text-xs text-muted">Задач</Text>
+                <Text className="text-xl font-bold text-foreground mt-1">5</Text>
+              </View>
+              <View className="flex-1 bg-surface rounded-lg p-3 border border-border">
+                <Text className="text-xs text-muted">Статус</Text>
+                <Text className="text-xl font-bold text-foreground mt-1">ОК</Text>
+              </View>
+            </View>
           </View>
         </View>
       </ScrollView>
