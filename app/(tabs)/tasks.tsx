@@ -2,28 +2,24 @@ import { ScrollView, Text, View, TouchableOpacity, FlatList, Alert } from "react
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useTasks } from "@/hooks/useTasks";
+import { AddTaskForm } from "@/components/AddTaskForm";
 import { useState } from "react";
 
 export default function TasksScreen() {
   const colors = useColors();
   const { activeTasks, statistics, createTask, changeTaskStatus, removeTask } = useTasks();
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [newTaskDescription, setNewTaskDescription] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
 
-  const handleAddTask = async () => {
-    if (!newTaskTitle.trim()) {
-      Alert.alert("Ошибка", "Пожалуйста, введите название задачи");
-      return;
-    }
-
+  const handleAddTask = async (title: string, description: string) => {
+    setIsCreating(true);
     try {
-      await createTask(newTaskTitle, newTaskDescription, "medium");
-      setNewTaskTitle("");
-      setNewTaskDescription("");
+      await createTask(title, description, "medium");
       setShowAddForm(false);
     } catch (error) {
       Alert.alert("Ошибка", "Не удалось создать задачу");
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -92,10 +88,12 @@ export default function TasksScreen() {
       <View className="flex-row justify-between items-start mb-2">
         <View className="flex-1">
           <Text className="text-lg font-semibold text-foreground">{item.title}</Text>
-          <Text className="text-sm text-muted mt-1">{item.description}</Text>
+          {item.description ? (
+            <Text className="text-sm text-muted mt-1">{item.description}</Text>
+          ) : null}
         </View>
         <View
-          className="px-3 py-1 rounded-full"
+          className="px-3 py-1 rounded-full ml-2"
           style={{ backgroundColor: getStatusColor(item.status) + "20" }}
         >
           <Text className="text-xs font-semibold" style={{ color: getStatusColor(item.status) }}>
@@ -149,57 +147,11 @@ export default function TasksScreen() {
       </View>
 
       {showAddForm && (
-        <View className="bg-surface rounded-lg p-4 mb-4 border border-border">
-          <Text className="text-sm font-semibold text-foreground mb-2">Новая задача</Text>
-          <View className="mb-3">
-            <Text className="text-xs text-muted mb-1">Название</Text>
-            <View
-              className="border rounded-lg px-3 py-2"
-              style={{ borderColor: colors.border }}
-            >
-              <Text
-                className="text-foreground"
-                onPress={() => {
-                  /* Здесь должно быть текстовое поле */
-                }}
-              >
-                {newTaskTitle || "Введите название..."}
-              </Text>
-            </View>
-          </View>
-          <View className="mb-3">
-            <Text className="text-xs text-muted mb-1">Описание</Text>
-            <View
-              className="border rounded-lg px-3 py-2"
-              style={{ borderColor: colors.border }}
-            >
-              <Text
-                className="text-foreground"
-                onPress={() => {
-                  /* Здесь должно быть текстовое поле */
-                }}
-              >
-                {newTaskDescription || "Введите описание..."}
-              </Text>
-            </View>
-          </View>
-          <View className="flex-row gap-2">
-            <TouchableOpacity
-              className="flex-1 py-2 rounded-lg"
-              style={{ backgroundColor: colors.primary }}
-              onPress={handleAddTask}
-            >
-              <Text className="text-white text-sm font-semibold text-center">Создать</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              className="flex-1 py-2 rounded-lg border"
-              style={{ borderColor: colors.border }}
-              onPress={() => setShowAddForm(false)}
-            >
-              <Text className="text-foreground text-sm font-semibold text-center">Отмена</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <AddTaskForm
+          onAdd={handleAddTask}
+          onCancel={() => setShowAddForm(false)}
+          isLoading={isCreating}
+        />
       )}
 
       {activeTasks.length > 0 ? (
