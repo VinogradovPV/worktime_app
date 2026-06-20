@@ -1,37 +1,56 @@
-import { ScrollView, Text, View, TouchableOpacity, FlatList } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, FlatList, Alert } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
+import { useTasks } from "@/hooks/useTasks";
 import { useState } from "react";
-
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  timeSpent: number; // в минутах
-  status: "active" | "paused" | "completed";
-  createdAt: Date;
-}
 
 export default function TasksScreen() {
   const colors = useColors();
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: "1",
-      title: "Разработка нового функционала",
-      description: "Реализовать модуль отчетов",
-      timeSpent: 120,
-      status: "active",
-      createdAt: new Date(),
-    },
-    {
-      id: "2",
-      title: "Тестирование приложения",
-      description: "Проверить основные функции",
-      timeSpent: 45,
-      status: "paused",
-      createdAt: new Date(),
-    },
-  ]);
+  const { activeTasks, statistics, createTask, changeTaskStatus, removeTask } = useTasks();
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDescription, setNewTaskDescription] = useState("");
+
+  const handleAddTask = async () => {
+    if (!newTaskTitle.trim()) {
+      Alert.alert("Ошибка", "Пожалуйста, введите название задачи");
+      return;
+    }
+
+    try {
+      await createTask(newTaskTitle, newTaskDescription, "medium");
+      setNewTaskTitle("");
+      setNewTaskDescription("");
+      setShowAddForm(false);
+    } catch (error) {
+      Alert.alert("Ошибка", "Не удалось создать задачу");
+    }
+  };
+
+  const handleCompleteTask = async (taskId: string) => {
+    try {
+      await changeTaskStatus(taskId, "completed");
+    } catch (error) {
+      Alert.alert("Ошибка", "Не удалось завершить задачу");
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    Alert.alert("Удалить задачу?", "Это действие нельзя отменить", [
+      { text: "Отмена", style: "cancel" },
+      {
+        text: "Удалить",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await removeTask(taskId);
+          } catch (error) {
+            Alert.alert("Ошибка", "Не удалось удалить задачу");
+          }
+        },
+      },
+    ]);
+  };
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -65,7 +84,7 @@ export default function TasksScreen() {
     }
   };
 
-  const renderTaskItem = ({ item }: { item: Task }) => (
+  const renderTaskItem = ({ item }: { item: any }) => (
     <View
       className="bg-surface rounded-lg p-4 mb-3 border border-border"
       style={{ borderColor: colors.border }}
@@ -90,26 +109,21 @@ export default function TasksScreen() {
           Время: {formatTime(item.timeSpent)}
         </Text>
         <View className="flex-row gap-2">
-          {item.status === "active" ? (
-            <TouchableOpacity
-              className="px-3 py-2 rounded-lg"
-              style={{ backgroundColor: colors.warning }}
-            >
-              <Text className="text-white text-sm font-semibold">Пауза</Text>
-            </TouchableOpacity>
-          ) : (
+          {item.status !== "completed" && (
             <TouchableOpacity
               className="px-3 py-2 rounded-lg"
               style={{ backgroundColor: colors.success }}
+              onPress={() => handleCompleteTask(item.id)}
             >
-              <Text className="text-white text-sm font-semibold">Запуск</Text>
+              <Text className="text-white text-sm font-semibold">✓</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
             className="px-3 py-2 rounded-lg"
             style={{ backgroundColor: colors.error }}
+            onPress={() => handleDeleteTask(item.id)}
           >
-            <Text className="text-white text-sm font-semibold">Удалить</Text>
+            <Text className="text-white text-sm font-semibold">×</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -119,26 +133,88 @@ export default function TasksScreen() {
   return (
     <ScreenContainer className="p-4">
       <View className="flex-row justify-between items-center mb-6">
-        <Text className="text-3xl font-bold text-foreground">Задачи</Text>
+        <View>
+          <Text className="text-3xl font-bold text-foreground">Задачи</Text>
+          <Text className="text-sm text-muted mt-1">
+            Активных: {statistics.active} | Завершено: {statistics.completed}
+          </Text>
+        </View>
         <TouchableOpacity
           className="w-12 h-12 rounded-full items-center justify-center"
           style={{ backgroundColor: colors.primary }}
+          onPress={() => setShowAddForm(!showAddForm)}
         >
-          <Text className="text-2xl text-white font-bold">+</Text>
+          <Text className="text-2xl text-white font-bold">{showAddForm ? "−" : "+"}</Text>
         </TouchableOpacity>
       </View>
 
-      {tasks.length > 0 ? (
-        <FlatList
-          data={tasks}
-          renderItem={renderTaskItem}
-          keyExtractor={(item) => item.id}
-          scrollEnabled={false}
-          contentContainerStyle={{ paddingBottom: 20 }}
-        />
+      {showAddForm && (
+        <View className="bg-surface rounded-lg p-4 mb-4 border border-border">
+          <Text className="text-sm font-semibold text-foreground mb-2">Новая задача</Text>
+          <View className="mb-3">
+            <Text className="text-xs text-muted mb-1">Название</Text>
+            <View
+              className="border rounded-lg px-3 py-2"
+              style={{ borderColor: colors.border }}
+            >
+              <Text
+                className="text-foreground"
+                onPress={() => {
+                  /* Здесь должно быть текстовое поле */
+                }}
+              >
+                {newTaskTitle || "Введите название..."}
+              </Text>
+            </View>
+          </View>
+          <View className="mb-3">
+            <Text className="text-xs text-muted mb-1">Описание</Text>
+            <View
+              className="border rounded-lg px-3 py-2"
+              style={{ borderColor: colors.border }}
+            >
+              <Text
+                className="text-foreground"
+                onPress={() => {
+                  /* Здесь должно быть текстовое поле */
+                }}
+              >
+                {newTaskDescription || "Введите описание..."}
+              </Text>
+            </View>
+          </View>
+          <View className="flex-row gap-2">
+            <TouchableOpacity
+              className="flex-1 py-2 rounded-lg"
+              style={{ backgroundColor: colors.primary }}
+              onPress={handleAddTask}
+            >
+              <Text className="text-white text-sm font-semibold text-center">Создать</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="flex-1 py-2 rounded-lg border"
+              style={{ borderColor: colors.border }}
+              onPress={() => setShowAddForm(false)}
+            >
+              <Text className="text-foreground text-sm font-semibold text-center">Отмена</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {activeTasks.length > 0 ? (
+        <ScrollView>
+          <FlatList
+            data={activeTasks}
+            renderItem={renderTaskItem}
+            keyExtractor={(item) => item.id}
+            scrollEnabled={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
+          />
+        </ScrollView>
       ) : (
         <View className="flex-1 items-center justify-center">
-          <Text className="text-lg text-muted">Нет задач</Text>
+          <Text className="text-lg text-muted">Нет активных задач</Text>
           <Text className="text-sm text-muted mt-2">Нажмите + для создания новой задачи</Text>
         </View>
       )}

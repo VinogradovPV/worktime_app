@@ -3,36 +3,39 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useState, useEffect } from "react";
 import * as Haptics from "expo-haptics";
-
-interface WorkSession {
-  id: string;
-  startTime: Date;
-  endTime?: Date;
-  breaks: Array<{ start: Date; end?: Date }>;
-  totalBreakTime: number;
-  status: "active" | "paused" | "completed";
-}
+import { useWorkSessions } from "@/hooks/useWorkSessions";
 
 export default function HomeScreen() {
   const colors = useColors();
+  const { currentSession, dailyStats, startWorkSession, endWorkSession, startBreak, endBreak } =
+    useWorkSessions();
   const [workStatus, setWorkStatus] = useState<"idle" | "working" | "break">("idle");
   const [elapsedTime, setElapsedTime] = useState(0); // в секундах
-  const [currentSession, setCurrentSession] = useState<WorkSession | null>(null);
-  const [todayWorkTime, setTodayWorkTime] = useState(8.5); // в часах
+
+  useEffect(() => {
+    if (currentSession) {
+      setWorkStatus(currentSession.status === "active" ? "working" : "break");
+    } else {
+      setWorkStatus("idle");
+    }
+  }, [currentSession]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
 
-    if (workStatus !== "idle") {
+    if (workStatus !== "idle" && currentSession) {
+      const startTime = new Date(currentSession.startTime).getTime();
       interval = setInterval(() => {
-        setElapsedTime((prev) => prev + 1);
+        const now = new Date().getTime();
+        const elapsed = Math.floor((now - startTime) / 1000);
+        setElapsedTime(elapsed);
       }, 1000);
     }
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [workStatus]);
+  }, [workStatus, currentSession]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -42,41 +45,44 @@ export default function HomeScreen() {
   };
 
   const handleStartWork = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setWorkStatus("working");
-    setElapsedTime(0);
-    setCurrentSession({
-      id: Date.now().toString(),
-      startTime: new Date(),
-      breaks: [],
-      totalBreakTime: 0,
-      status: "active",
-    });
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await startWorkSession();
+    } catch (error) {
+      console.error("Ошибка при начале работы:", error);
+    }
   };
 
   const handleEndWork = async () => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setWorkStatus("idle");
-    if (currentSession) {
-      setCurrentSession({
-        ...currentSession,
-        endTime: new Date(),
-        status: "completed",
-      });
+    try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await endWorkSession();
+      setElapsedTime(0);
+    } catch (error) {
+      console.error("Ошибка при завершении работы:", error);
     }
-    // Здесь должна быть логика сохранения сессии
   };
 
   const handleStartBreak = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setWorkStatus("break");
-    setElapsedTime(0);
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await startBreak();
+      setWorkStatus("break");
+      setElapsedTime(0);
+    } catch (error) {
+      console.error("Ошибка при начале перерыва:", error);
+    }
   };
 
   const handleEndBreak = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setWorkStatus("working");
-    setElapsedTime(0);
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await endBreak();
+      setWorkStatus("working");
+      setElapsedTime(0);
+    } catch (error) {
+      console.error("Ошибка при завершении перерыва:", error);
+    }
   };
 
   const getStatusText = () => {
@@ -138,13 +144,15 @@ export default function HomeScreen() {
           <View className="bg-surface rounded-lg p-4 border border-border">
             <View className="flex-row justify-between items-center mb-3">
               <Text className="text-sm font-semibold text-muted">Сегодня отработано</Text>
-              <Text className="text-2xl font-bold text-foreground">{todayWorkTime.toFixed(1)} ч</Text>
+              <Text className="text-2xl font-bold text-foreground">
+                {dailyStats ? dailyStats.totalWorkTime.toFixed(1) : "0.0"} ч
+              </Text>
             </View>
             <View className="w-full h-2 bg-border rounded-full overflow-hidden">
               <View
                 className="h-full rounded-full"
                 style={{
-                  width: `${(todayWorkTime / 8) * 100}%`,
+                  width: `${dailyStats ? (dailyStats.totalWorkTime / 8) * 100 : 0}%`,
                   backgroundColor: colors.primary,
                 }}
               />
@@ -233,11 +241,15 @@ export default function HomeScreen() {
             <View className="flex-row gap-2">
               <View className="flex-1 bg-surface rounded-lg p-3 border border-border">
                 <Text className="text-xs text-muted">Перерывов</Text>
-                <Text className="text-xl font-bold text-foreground mt-1">2</Text>
+                <Text className="text-xl font-bold text-foreground mt-1">
+                  {currentSession ? currentSession.breaks.length : "0"}
+                </Text>
               </View>
               <View className="flex-1 bg-surface rounded-lg p-3 border border-border">
-                <Text className="text-xs text-muted">Задач</Text>
-                <Text className="text-xl font-bold text-foreground mt-1">5</Text>
+                <Text className="text-xs text-muted">Время перерыва</Text>
+                <Text className="text-xl font-bold text-foreground mt-1">
+                  {currentSession ? Math.floor(currentSession.totalBreakTime / 60) : "0"}м
+                </Text>
               </View>
               <View className="flex-1 bg-surface rounded-lg p-3 border border-border">
                 <Text className="text-xs text-muted">Статус</Text>
