@@ -1,127 +1,261 @@
-import { ScrollView, Text, View, TouchableOpacity, Switch } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, TextInput, Switch, Alert } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useState } from "react";
+import { useNotifications } from "@/hooks/useNotifications";
+import { useState, useEffect } from "react";
+import * as Haptics from "expo-haptics";
 
 export default function SettingsScreen() {
   const colors = useColors();
-  const colorScheme = useColorScheme();
-  const [notifications, setNotifications] = useState(true);
-  const [language, setLanguage] = useState<"ru" | "en">("ru");
-  const [theme, setTheme] = useState<"light" | "dark" | "auto">("auto");
+  const { settings, vacationPeriods, updateSettings, addVacation, removeVacation } = useNotifications();
+  const [morningTime, setMorningTime] = useState("09:30");
+  const [eveningTime, setEveningTime] = useState("10:00");
+  const [morningEnabled, setMorningEnabled] = useState(true);
+  const [eveningEnabled, setEveningEnabled] = useState(true);
+  const [vacationStartDate, setVacationStartDate] = useState("");
+  const [vacationEndDate, setVacationEndDate] = useState("");
+  const [vacationType, setVacationType] = useState<"vacation" | "sick_leave" | "unpaid_leave">("vacation");
 
-  const SettingItem = ({
-    label,
-    value,
-    onPress,
-  }: {
-    label: string;
-    value?: string;
-    onPress?: () => void;
-  }) => (
-    <TouchableOpacity
-      className="flex-row justify-between items-center py-3 px-4 border-b border-border"
-      style={{ borderColor: colors.border }}
-      onPress={onPress}
-    >
-      <Text className="text-base text-foreground">{label}</Text>
-      {value && <Text className="text-sm text-muted">{value}</Text>}
-    </TouchableOpacity>
-  );
+  useEffect(() => {
+    if (settings) {
+      setMorningTime(settings.morningNotificationTime);
+      setEveningTime(settings.eveningNotificationTime);
+      setMorningEnabled(settings.morningNotificationEnabled);
+      setEveningEnabled(settings.eveningNotificationEnabled);
+    }
+  }, [settings]);
+
+  const handleSaveSettings = async () => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await updateSettings({
+        morningNotificationTime: morningTime,
+        eveningNotificationTime: eveningTime,
+        morningNotificationEnabled: morningEnabled,
+        eveningNotificationEnabled: eveningEnabled,
+      });
+      Alert.alert("Успешно", "Настройки уведомлений сохранены");
+    } catch (error) {
+      Alert.alert("Ошибка", "Не удалось сохранить настройки");
+    }
+  };
+
+  const handleAddVacation = async () => {
+    if (!vacationStartDate || !vacationEndDate) {
+      Alert.alert("Ошибка", "Укажите начало и конец отпуска");
+      return;
+    }
+
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await addVacation(vacationStartDate, vacationEndDate, vacationType);
+      setVacationStartDate("");
+      setVacationEndDate("");
+      Alert.alert("Успешно", "Период отпуска добавлен");
+    } catch (error) {
+      Alert.alert("Ошибка", "Не удалось добавить период отпуска");
+    }
+  };
+
+  const handleRemoveVacation = async (periodId: string) => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await removeVacation(periodId);
+      Alert.alert("Успешно", "Период отпуска удален");
+    } catch (error) {
+      Alert.alert("Ошибка", "Не удалось удалить период отпуска");
+    }
+  };
+
+  const getVacationTypeLabel = (type: string) => {
+    switch (type) {
+      case "vacation":
+        return "Отпуск";
+      case "sick_leave":
+        return "Больничный";
+      case "unpaid_leave":
+        return "Неоплачиваемый отпуск";
+      default:
+        return type;
+    }
+  };
 
   return (
-    <ScreenContainer className="p-0">
-      <ScrollView>
-        {/* Профиль пользователя */}
-        <View className="bg-surface px-4 py-6 border-b border-border" style={{ borderColor: colors.border }}>
-          <Text className="text-3xl font-bold text-foreground mb-2">Настройки</Text>
-          <Text className="text-sm text-muted">Иван Иванов</Text>
-          <Text className="text-xs text-muted mt-1">Сотрудник</Text>
+    <ScreenContainer className="p-4">
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+        {/* Заголовок */}
+        <View className="mb-8">
+          <Text className="text-3xl font-bold text-foreground">Настройки</Text>
         </View>
 
-        {/* Приложение */}
-        <View className="mt-4">
-          <Text className="text-sm font-semibold text-muted px-4 py-2">ПРИЛОЖЕНИЕ</Text>
+        {/* Раздел уведомлений */}
+        <View className="mb-8">
+          <Text className="text-lg font-semibold text-foreground mb-4">Уведомления</Text>
 
-          <View className="bg-surface border-t border-b border-border" style={{ borderColor: colors.border }}>
-            <SettingItem
-              label="Язык"
-              value={language === "ru" ? "Русский" : "English"}
-              onPress={() => setLanguage(language === "ru" ? "en" : "ru")}
-            />
-
-            <SettingItem
-              label="Тема"
-              value={
-                theme === "light"
-                  ? "Светлая"
-                  : theme === "dark"
-                    ? "Темная"
-                    : "Автоматически"
-              }
-              onPress={() => {
-                const themes: Array<"light" | "dark" | "auto"> = ["light", "dark", "auto"];
-                const currentIndex = themes.indexOf(theme);
-                setTheme(themes[(currentIndex + 1) % themes.length]);
-              }}
-            />
-          </View>
-        </View>
-
-        {/* Уведомления */}
-        <View className="mt-4">
-          <Text className="text-sm font-semibold text-muted px-4 py-2">УВЕДОМЛЕНИЯ</Text>
-
-          <View className="bg-surface border-t border-b border-border" style={{ borderColor: colors.border }}>
-            <View className="flex-row justify-between items-center py-3 px-4 border-b border-border" style={{ borderColor: colors.border }}>
-              <Text className="text-base text-foreground">Включить уведомления</Text>
+          {/* Утреннее уведомление */}
+          <View className="rounded-lg p-4 mb-4" style={{ backgroundColor: colors.surface }}>
+            <View className="flex-row justify-between items-center mb-3">
+              <Text className="font-semibold text-foreground">Уведомление о начале дня</Text>
               <Switch
-                value={notifications}
-                onValueChange={setNotifications}
+                value={morningEnabled}
+                onValueChange={setMorningEnabled}
                 trackColor={{ false: colors.border, true: colors.success }}
-                thumbColor={notifications ? colors.success : colors.muted}
+              />
+            </View>
+            {morningEnabled && (
+              <View>
+                <Text className="text-xs text-muted mb-2">Время уведомления (HH:mm)</Text>
+                <TextInput
+                  value={morningTime}
+                  onChangeText={setMorningTime}
+                  placeholder="09:30"
+                  placeholderTextColor={colors.muted}
+                  className="border rounded-lg p-3 text-foreground"
+                  style={{ borderColor: colors.border }}
+                  maxLength={5}
+                />
+              </View>
+            )}
+          </View>
+
+          {/* Вечернее уведомление */}
+          <View className="rounded-lg p-4 mb-4" style={{ backgroundColor: colors.surface }}>
+            <View className="flex-row justify-between items-center mb-3">
+              <Text className="font-semibold text-foreground">Отчет о рабочем времени</Text>
+              <Switch
+                value={eveningEnabled}
+                onValueChange={setEveningEnabled}
+                trackColor={{ false: colors.border, true: colors.success }}
+              />
+            </View>
+            {eveningEnabled && (
+              <View>
+                <Text className="text-xs text-muted mb-2">Время уведомления (HH:mm)</Text>
+                <TextInput
+                  value={eveningTime}
+                  onChangeText={setEveningTime}
+                  placeholder="10:00"
+                  placeholderTextColor={colors.muted}
+                  className="border rounded-lg p-3 text-foreground"
+                  style={{ borderColor: colors.border }}
+                  maxLength={5}
+                />
+              </View>
+            )}
+          </View>
+
+          {/* Кнопка сохранения */}
+          <TouchableOpacity
+            className="rounded-lg p-3 items-center justify-center mb-6"
+            style={{ backgroundColor: colors.primary }}
+            onPress={handleSaveSettings}
+          >
+            <Text className="text-white font-semibold">Сохранить настройки</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Раздел отпусков */}
+        <View className="mb-8">
+          <Text className="text-lg font-semibold text-foreground mb-4">Управление отпусками</Text>
+
+          {/* Форма добавления отпуска */}
+          <View className="rounded-lg p-4 mb-4" style={{ backgroundColor: colors.surface }}>
+            <Text className="text-sm font-semibold text-foreground mb-3">Добавить период отпуска</Text>
+
+            <View className="mb-3">
+              <Text className="text-xs text-muted mb-2">Начало (YYYY-MM-DD)</Text>
+              <TextInput
+                value={vacationStartDate}
+                onChangeText={setVacationStartDate}
+                placeholder="2026-06-21"
+                placeholderTextColor={colors.muted}
+                className="border rounded-lg p-3 text-foreground"
+                style={{ borderColor: colors.border }}
               />
             </View>
 
-            <SettingItem label="Напоминание о начале работы" />
-            <SettingItem label="Напоминание о завершении работы" />
-            <SettingItem label="Уведомления о перерывах" />
+            <View className="mb-3">
+              <Text className="text-xs text-muted mb-2">Конец (YYYY-MM-DD)</Text>
+              <TextInput
+                value={vacationEndDate}
+                onChangeText={setVacationEndDate}
+                placeholder="2026-06-28"
+                placeholderTextColor={colors.muted}
+                className="border rounded-lg p-3 text-foreground"
+                style={{ borderColor: colors.border }}
+              />
+            </View>
+
+            <View className="mb-4">
+              <Text className="text-xs text-muted mb-2">Тип отпуска</Text>
+              <View className="flex-row gap-2">
+                {(["vacation", "sick_leave", "unpaid_leave"] as const).map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    className="flex-1 rounded-lg p-2 items-center"
+                    style={{
+                      backgroundColor: vacationType === type ? colors.primary : colors.border,
+                    }}
+                    onPress={() => setVacationType(type)}
+                  >
+                    <Text
+                      className="text-xs font-semibold"
+                      style={{ color: vacationType === type ? "white" : colors.foreground }}
+                    >
+                      {getVacationTypeLabel(type)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <TouchableOpacity
+              className="rounded-lg p-3 items-center justify-center"
+              style={{ backgroundColor: colors.success }}
+              onPress={handleAddVacation}
+            >
+              <Text className="text-white font-semibold">Добавить</Text>
+            </TouchableOpacity>
           </View>
+
+          {/* Список отпусков */}
+          {vacationPeriods.length > 0 && (
+            <View>
+              <Text className="text-sm font-semibold text-foreground mb-2">Активные периоды</Text>
+              {vacationPeriods.map((period) => (
+                <View
+                  key={period.id}
+                  className="rounded-lg p-3 mb-2 flex-row justify-between items-center"
+                  style={{ backgroundColor: colors.surface }}
+                >
+                  <View className="flex-1">
+                    <Text className="font-semibold text-foreground">
+                      {getVacationTypeLabel(period.type)}
+                    </Text>
+                    <Text className="text-xs text-muted mt-1">
+                      {period.startDate} - {period.endDate}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    className="rounded-lg p-2"
+                    style={{ backgroundColor: colors.error }}
+                    onPress={() => handleRemoveVacation(period.id)}
+                  >
+                    <Text className="text-white text-xs font-semibold">Удалить</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
-        {/* Приватность и безопасность */}
-        <View className="mt-4">
-          <Text className="text-sm font-semibold text-muted px-4 py-2">ПРИВАТНОСТЬ И БЕЗОПАСНОСТЬ</Text>
-
-          <View className="bg-surface border-t border-b border-border" style={{ borderColor: colors.border }}>
-            <SettingItem label="Информация о GPS" />
-            <SettingItem label="Смена пароля" />
-            <SettingItem label="Двухфакторная аутентификация" />
-          </View>
-        </View>
-
-        {/* О приложении */}
-        <View className="mt-4">
-          <Text className="text-sm font-semibold text-muted px-4 py-2">О ПРИЛОЖЕНИИ</Text>
-
-          <View className="bg-surface border-t border-b border-border" style={{ borderColor: colors.border }}>
-            <SettingItem label="Версия" value="1.0.0" />
-            <SettingItem label="Политика конфиденциальности" />
-            <SettingItem label="Условия использования" />
-          </View>
-        </View>
-
-        {/* Действия */}
-        <View className="mt-6 px-4 pb-6">
-          <TouchableOpacity
-            className="w-full py-3 rounded-lg items-center justify-center border border-error"
-            style={{ borderColor: colors.error }}
-          >
-            <Text className="text-base font-semibold" style={{ color: colors.error }}>
-              Выход из аккаунта
-            </Text>
-          </TouchableOpacity>
+        {/* Раздел информации */}
+        <View className="rounded-lg p-4" style={{ backgroundColor: colors.surface }}>
+          <Text className="text-sm font-semibold text-foreground mb-2">Информация</Text>
+          <Text className="text-xs text-muted">
+            Версия приложения: 1.0.0{"\n"}
+            Последнее обновление: 20 июня 2026
+          </Text>
         </View>
       </ScrollView>
     </ScreenContainer>
