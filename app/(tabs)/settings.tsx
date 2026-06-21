@@ -121,7 +121,7 @@ export default function SettingsScreen() {
           {/* Вечернее уведомление */}
           <View className="rounded-lg p-4 mb-4" style={{ backgroundColor: colors.surface }}>
             <View className="flex-row justify-between items-center mb-3">
-              <Text className="font-semibold text-foreground">Отчет о рабочем времени</Text>
+              <Text className="font-semibold text-foreground">Отчет за предыдущий день</Text>
               <Switch
                 value={eveningEnabled}
                 onValueChange={setEveningEnabled}

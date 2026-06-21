@@ -149,7 +149,7 @@ export function useNotifications() {
       const wasYesterdayWorkday = await isWorkday(yesterdayStr);
 
       if (wasYesterdayWorkday && settings.eveningNotificationEnabled) {
-        // Запланировать вечернее уведомление (о времени работы за предыдущий день)
+        // Запланировать утреннее уведомление в 10:00 с отчетом за предыдущий рабочий день
         const [hours, minutes] = settings.eveningNotificationTime.split(":").map(Number);
         const notificationTime = new Date(today);
         notificationTime.setHours(hours, minutes, 0, 0);
@@ -157,8 +157,8 @@ export function useNotifications() {
         if (notificationTime > new Date()) {
           await Notifications.scheduleNotificationAsync({
             content: {
-              title: "Отчет о рабочем времени",
-              body: "Посмотрите, сколько часов вы отработали вчера",
+              title: "Отчет за предыдущий день",
+              body: "Посмотрите, сколько часов вы отработали",
               sound: "default",
             },
             trigger: {
