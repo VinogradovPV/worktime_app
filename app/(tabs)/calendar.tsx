@@ -3,7 +3,8 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useState, useEffect } from "react";
 import { useNotifications } from "@/hooks/useNotifications";
-import { getProductionCalendar, getVacationPeriods } from "@/lib/storage/notificationSettings";
+import { getProductionCalendar, getVacationPeriods, addVacationPeriod } from "@/lib/storage/notificationSettings";
+import { AddVacationModal } from "@/components/AddVacationModal";
 
 interface DayInfo {
   date: string; // YYYY-MM-DD
@@ -17,6 +18,8 @@ export default function CalendarScreen() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [holidays, setHolidays] = useState<string[]>([]);
   const [vacationPeriods, setVacationPeriods] = useState<any[]>([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>("");
 
   useEffect(() => {
     loadCalendarData();
@@ -133,6 +136,27 @@ export default function CalendarScreen() {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
   };
 
+  const handleDayPress = (day: number) => {
+    const dateStr = formatDate(currentDate.getFullYear(), currentDate.getMonth(), day);
+    setSelectedDate(dateStr);
+    setModalVisible(true);
+  };
+
+  const handleAddVacation = async (startDate: string, endDate: string, type: "vacation" | "sick_leave" | "unpaid_leave") => {
+    try {
+      await addVacationPeriod({
+        id: Date.now().toString(),
+        startDate,
+        endDate,
+        type,
+      });
+      await loadCalendarData();
+    } catch (error) {
+      console.error("Ошибка при добавлении периода:", error);
+      throw error;
+    }
+  };
+
   return (
     <ScreenContainer className="p-4">
       <View className="flex-row justify-between items-center mb-6">
@@ -176,6 +200,7 @@ export default function CalendarScreen() {
                   borderWidth: 1.5,
                   borderColor: colors_info.border,
                 }}
+                onPress={() => handleDayPress(day)}
               >
                 <View className="items-center justify-center">
                   <Text className="text-sm font-semibold text-foreground">{day}</Text>
@@ -262,6 +287,14 @@ export default function CalendarScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Модальное окно для добавления отпуска */}
+      <AddVacationModal
+        visible={modalVisible}
+        selectedDate={selectedDate}
+        onClose={() => setModalVisible(false)}
+        onAddVacation={handleAddVacation}
+      />
     </ScreenContainer>
   );
 }
