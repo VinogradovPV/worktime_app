@@ -3,8 +3,9 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useState, useEffect } from "react";
 import { useNotifications } from "@/hooks/useNotifications";
-import { getProductionCalendar, getVacationPeriods, addVacationPeriod } from "@/lib/storage/notificationSettings";
+import { getProductionCalendar, getVacationPeriods, addVacationPeriod, removeVacationPeriod } from "@/lib/storage/notificationSettings";
 import { AddVacationModal } from "@/components/AddVacationModal";
+import { EditVacationModal } from "@/components/EditVacationModal";
 
 interface DayInfo {
   date: string; // YYYY-MM-DD
@@ -20,6 +21,8 @@ export default function CalendarScreen() {
   const [vacationPeriods, setVacationPeriods] = useState<any[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>("");
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState<any>(null);
 
   useEffect(() => {
     loadCalendarData();
@@ -157,6 +160,49 @@ export default function CalendarScreen() {
     }
   };
 
+  const getPeriodAtDate = (dateStr: string): any => {
+    for (const period of vacationPeriods) {
+      const startDate = new Date(period.startDate);
+      const endDate = new Date(period.endDate);
+      const checkDate = new Date(dateStr);
+
+      if (checkDate >= startDate && checkDate <= endDate) {
+        return period;
+      }
+    }
+    return null;
+  };
+
+  const handleDayLongPress = (day: number) => {
+    const dateStr = formatDate(currentDate.getFullYear(), currentDate.getMonth(), day);
+    const period = getPeriodAtDate(dateStr);
+    if (period) {
+      setSelectedPeriod(period);
+      setEditModalVisible(true);
+    }
+  };
+
+  const handleUpdateVacation = async (updatedPeriod: any) => {
+    try {
+      await removeVacationPeriod(updatedPeriod.id);
+      await addVacationPeriod(updatedPeriod);
+      await loadCalendarData();
+    } catch (error) {
+      console.error("Ошибка при обновлении периода:", error);
+      throw error;
+    }
+  };
+
+  const handleDeleteVacation = async (periodId: string) => {
+    try {
+      await removeVacationPeriod(periodId);
+      await loadCalendarData();
+    } catch (error) {
+      console.error("Ошибка при удалении периода:", error);
+      throw error;
+    }
+  };
+
   return (
     <ScreenContainer className="p-4">
       <View className="flex-row justify-between items-center mb-6">
@@ -201,6 +247,7 @@ export default function CalendarScreen() {
                   borderColor: colors_info.border,
                 }}
                 onPress={() => handleDayPress(day)}
+                onLongPress={() => handleDayLongPress(day)}
               >
                 <View className="items-center justify-center">
                   <Text className="text-sm font-semibold text-foreground">{day}</Text>
@@ -294,6 +341,18 @@ export default function CalendarScreen() {
         selectedDate={selectedDate}
         onClose={() => setModalVisible(false)}
         onAddVacation={handleAddVacation}
+      />
+
+      {/* Модальное окно для редактирования отпуска */}
+      <EditVacationModal
+        visible={editModalVisible}
+        period={selectedPeriod}
+        onClose={() => {
+          setEditModalVisible(false);
+          setSelectedPeriod(null);
+        }}
+        onUpdate={handleUpdateVacation}
+        onDelete={handleDeleteVacation}
       />
     </ScreenContainer>
   );
