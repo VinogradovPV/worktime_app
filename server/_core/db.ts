@@ -2,7 +2,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import * as schema from "../../drizzle/schema";
 
-let cachedDb: ReturnType<typeof drizzle> | null = null;
+let cachedDb: any = null;
 let pool: mysql.Pool | null = null;
 
 /**

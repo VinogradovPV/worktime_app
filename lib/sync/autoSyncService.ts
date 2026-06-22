@@ -14,7 +14,7 @@ class AutoSyncService {
     syncInterval: 5 * 60 * 1000, // 5 minutes
   };
 
-  private syncTimer: NodeJS.Timeout | null = null;
+  private syncTimer: ReturnType<typeof setInterval> | null = null;
   private lastNetworkState: boolean = false;
   private listeners: Set<(isOnline: boolean) => void> = new Set();
 
@@ -81,7 +81,7 @@ class AutoSyncService {
       }
 
       if (this.config.syncOnWifiOnly) {
-        const type = await Network.getNetworkAsync();
+        const type = await Network.getNetworkStateAsync();
         if (type.type !== Network.NetworkStateType.WIFI) {
           return; // Skip if not on WiFi
         }

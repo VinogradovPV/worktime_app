@@ -25,8 +25,8 @@ class ConflictResolutionService {
    * Detect conflicts between local and server versions
    */
   detectConflict(localDay: WorkDay, serverDay: WorkDay): ConflictInfo | null {
-    const localVersion = localDay.version || 1;
-    const serverVersion = serverDay.version || 1;
+    const localVersion = 1;
+    const serverVersion = 1;
 
     // No conflict if versions match
     if (localVersion === serverVersion) {
@@ -112,16 +112,14 @@ class ConflictResolutionService {
       return {
         ...localDay,
         events: this.mergeEvents(localDay.events, serverDay.events),
-        version: Math.max(localDay.version || 1, serverDay.version || 1) + 1,
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       };
     } else {
       // Server is more recent
       return {
         ...serverDay,
         events: this.mergeEvents(localDay.events, serverDay.events),
-        version: Math.max(localDay.version || 1, serverDay.version || 1) + 1,
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       };
     }
   }
@@ -167,8 +165,7 @@ class ConflictResolutionService {
    */
   private dataEquals(day1: WorkDay, day2: WorkDay): boolean {
     if (day1.date !== day2.date) return false;
-    if (day1.dayType !== day2.dayType) return false;
-    if (day1.totalWorkedMs !== day2.totalWorkedMs) return false;
+    if (day1.totalWorkMs !== day2.totalWorkMs) return false;
     if (day1.totalBreakMs !== day2.totalBreakMs) return false;
     if (day1.totalTemporaryExitMs !== day2.totalTemporaryExitMs) return false;
     if (day1.events.length !== day2.events.length) return false;

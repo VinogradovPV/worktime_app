@@ -73,7 +73,7 @@ export const appRouter = router({
         const workDays = await db.getUnsyncedWorkDays(ctx.user.id, since);
 
         return {
-          workDays: workDays.map((day) => ({
+          workDays: workDays.map((day: any) => ({
             id: day.id,
             date: day.date,
             dayType: day.dayType,
@@ -94,7 +94,7 @@ export const appRouter = router({
 
       return {
         lastSyncTime,
-        syncHistory: syncHistory.map((log) => ({
+        syncHistory: syncHistory.map((log: any) => ({
           id: log.id,
           action: log.action,
           status: log.status,

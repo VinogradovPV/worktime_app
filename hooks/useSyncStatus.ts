@@ -16,11 +16,13 @@ export function useSyncStatus() {
     });
 
     // Subscribe to status changes
-    const unsubscribe = syncService.subscribe((status) => {
+    const unsubscribe = syncService.subscribe((status: SyncStatus) => {
       setSyncStatus(status);
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const triggerSync = async () => {

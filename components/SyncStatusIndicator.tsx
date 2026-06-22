@@ -25,11 +25,13 @@ export function SyncStatusIndicator({
   const scaleAnim = useSharedValue(1);
 
   useEffect(() => {
-    const unsubscribe = syncService.subscribe((status) => {
+    const unsubscribe = syncService.subscribe((status: SyncStatus) => {
       setSyncStatus(status);
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const handleSyncPress = () => {
