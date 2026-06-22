@@ -15,10 +15,10 @@ interface I18nProviderProps {
 }
 
 export function I18nProvider({ children }: I18nProviderProps) {
+  // Default to 'ru' immediately — no blocking on AsyncStorage load
   const [language, setLanguageState] = useState<Language>('ru');
-  const [isLoaded, setIsLoaded] = useState(false);
 
-  // Загрузить сохраненный язык при инициализации
+  // Load saved language asynchronously — does NOT block rendering
   useEffect(() => {
     const loadLanguage = async () => {
       try {
@@ -27,16 +27,14 @@ export function I18nProvider({ children }: I18nProviderProps) {
           setLanguageState(savedLanguage);
         }
       } catch (error) {
-        console.error('Error loading language:', error);
-      } finally {
-        setIsLoaded(true);
+        // Silently ignore — keep default 'ru'
       }
     };
 
     loadLanguage();
   }, []);
 
-  // Функция для смены языка
+  // Change language and persist
   const setLanguage = async (lang: Language) => {
     try {
       await AsyncStorage.setItem('appLanguage', lang);
@@ -46,7 +44,7 @@ export function I18nProvider({ children }: I18nProviderProps) {
     }
   };
 
-  // Функция для получения переводов по пути (например, 'home.title')
+  // Resolve translation by dot-path (e.g. 'home.title')
   const t = (path: string): string => {
     const keys = path.split('.');
     let value: any = translations[language];
@@ -55,17 +53,23 @@ export function I18nProvider({ children }: I18nProviderProps) {
       if (value && typeof value === 'object' && key in value) {
         value = value[key];
       } else {
-        return path; // Вернуть путь если перевод не найден
+        // Fallback: try 'ru' if current language key is missing
+        let fallback: any = translations['ru'];
+        for (const k of keys) {
+          if (fallback && typeof fallback === 'object' && k in fallback) {
+            fallback = fallback[k];
+          } else {
+            return path;
+          }
+        }
+        return typeof fallback === 'string' ? fallback : path;
       }
     }
 
     return typeof value === 'string' ? value : path;
   };
 
-  if (!isLoaded) {
-    return null; // Или показать загрузку
-  }
-
+  // Always render children — no blocking null return
   return (
     <I18nContext.Provider value={{ language, setLanguage, t }}>
       {children}
