@@ -2,14 +2,16 @@ import { ScrollView, Text, View, TouchableOpacity } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useState, useEffect } from "react";
-import { useNotifications } from "@/hooks/useNotifications";
 import { getProductionCalendar, getVacationPeriods, addVacationPeriod, removeVacationPeriod } from "@/lib/storage/notificationSettings";
 import { AddVacationModal } from "@/components/AddVacationModal";
 import { EditVacationModal } from "@/components/EditVacationModal";
 import { DayDetailModal } from "@/components/DayDetailModal";
+import { CalendarHeader } from "@/components/CalendarHeader";
+import { CalendarStatsCards } from "@/components/CalendarStatsCards";
 import { WeekCalendarView } from "@/components/WeekCalendarView";
 import { YearCalendarView } from "@/components/YearCalendarView";
 import { QuarterCalendarView } from "@/components/QuarterCalendarView";
+import { getPeriodStats, getPeriodStart, getPeriodEnd, CalendarStats } from "@/lib/storage/calendarStatsService";
 
 type CalendarMode = "month" | "week" | "quarter" | "year";
 
@@ -34,10 +36,12 @@ export default function CalendarScreen() {
   const [selectedDayForDetail, setSelectedDayForDetail] = useState<Date | null>(null);
   const [selectedDayType, setSelectedDayType] = useState<"weekend" | "holiday" | "vacation" | "workday">("workday");
   const [selectedDayVacationType, setSelectedDayVacationType] = useState<"vacation" | "sick_leave" | "unpaid_leave" | undefined>(undefined);
+  const [periodStats, setPeriodStats] = useState<CalendarStats | null>(null);
 
   useEffect(() => {
     loadCalendarData();
-  }, [currentDate]);
+    loadPeriodStats();
+  }, [currentDate, calendarMode]);
 
   const loadCalendarData = async () => {
     try {
@@ -55,6 +59,17 @@ export default function CalendarScreen() {
     }
   };
 
+  const loadPeriodStats = async () => {
+    try {
+      const startDate = getPeriodStart(currentDate, calendarMode);
+      const endDate = getPeriodEnd(currentDate, calendarMode);
+      const stats = await getPeriodStats(startDate, endDate, currentDate.getFullYear());
+      setPeriodStats(stats);
+    } catch (error) {
+      console.error("Ошибка при расчете статистики периода:", error);
+    }
+  };
+
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   };
@@ -69,7 +84,7 @@ export default function CalendarScreen() {
 
   const isWeekend = (date: Date): boolean => {
     const dayOfWeek = date.getDay();
-    return dayOfWeek === 0 || dayOfWeek === 6; // 0 = воскресенье, 6 = суббота
+    return dayOfWeek === 0 || dayOfWeek === 6;
   };
 
   const isHoliday = (dateStr: string): boolean => {
@@ -165,52 +180,6 @@ export default function CalendarScreen() {
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const emptyDays = Array.from({ length: firstDay }, (_, i) => i);
 
-  const monthName = currentDate.toLocaleString("ru-RU", { month: "long", year: "numeric" });
-
-  const previousMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
-  };
-
-  const nextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
-  };
-
-  const previousWeek = () => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(currentDate.getDate() - 7);
-    setCurrentDate(newDate);
-  };
-
-  const nextWeek = () => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(currentDate.getDate() + 7);
-    setCurrentDate(newDate);
-  };
-
-  const previousQuarter = () => {
-    const newDate = new Date(currentDate);
-    newDate.setMonth(currentDate.getMonth() - 3);
-    setCurrentDate(newDate);
-  };
-
-  const nextQuarter = () => {
-    const newDate = new Date(currentDate);
-    newDate.setMonth(currentDate.getMonth() + 3);
-    setCurrentDate(newDate);
-  };
-
-  const previousYear = () => {
-    setCurrentDate(new Date(currentDate.getFullYear() - 1, currentDate.getMonth()));
-  };
-
-  const nextYear = () => {
-    setCurrentDate(new Date(currentDate.getFullYear() + 1, currentDate.getMonth()));
-  };
-
-  const getCurrentQuarter = () => {
-    return Math.floor(currentDate.getMonth() / 3) + 1;
-  };
-
   const handleDayPress = (day: number | Date) => {
     let date: Date;
 
@@ -220,7 +189,6 @@ export default function CalendarScreen() {
       date = day;
     }
 
-    // Показываем детали дня
     const dayInfo = getDayTypeFromDate(date);
     setSelectedDayForDetail(date);
     setSelectedDayType(dayInfo.type);
@@ -237,6 +205,7 @@ export default function CalendarScreen() {
         type,
       });
       await loadCalendarData();
+      await loadPeriodStats();
     } catch (error) {
       console.error("Ошибка при добавлении периода:", error);
       throw error;
@@ -270,6 +239,7 @@ export default function CalendarScreen() {
       await removeVacationPeriod(updatedPeriod.id);
       await addVacationPeriod(updatedPeriod);
       await loadCalendarData();
+      await loadPeriodStats();
     } catch (error) {
       console.error("Ошибка при обновлении периода:", error);
       throw error;
@@ -280,86 +250,77 @@ export default function CalendarScreen() {
     try {
       await removeVacationPeriod(periodId);
       await loadCalendarData();
+      await loadPeriodStats();
     } catch (error) {
       console.error("Ошибка при удалении периода:", error);
       throw error;
     }
   };
 
-  const getModeButtonStyle = (mode: CalendarMode) => {
-    const isActive = calendarMode === mode;
-    return {
-      backgroundColor: isActive ? colors.primary : colors.surface,
-      borderColor: isActive ? colors.primary : colors.border,
-    };
+  const handlePreviousPeriod = () => {
+    const newDate = new Date(currentDate);
+    switch (calendarMode) {
+      case "year":
+        newDate.setFullYear(newDate.getFullYear() - 1);
+        break;
+      case "quarter":
+        newDate.setMonth(newDate.getMonth() - 3);
+        break;
+      case "month":
+        newDate.setMonth(newDate.getMonth() - 1);
+        break;
+      case "week":
+        newDate.setDate(newDate.getDate() - 7);
+        break;
+    }
+    setCurrentDate(newDate);
   };
 
-  const getModeButtonTextStyle = (mode: CalendarMode) => {
-    const isActive = calendarMode === mode;
-    return {
-      color: isActive ? colors.background : colors.foreground,
-    };
+  const handleNextPeriod = () => {
+    const newDate = new Date(currentDate);
+    switch (calendarMode) {
+      case "year":
+        newDate.setFullYear(newDate.getFullYear() + 1);
+        break;
+      case "quarter":
+        newDate.setMonth(newDate.getMonth() + 3);
+        break;
+      case "month":
+        newDate.setMonth(newDate.getMonth() + 1);
+        break;
+      case "week":
+        newDate.setDate(newDate.getDate() + 7);
+        break;
+    }
+    setCurrentDate(newDate);
+  };
+
+  const handleToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  const getCurrentQuarter = () => {
+    return Math.floor(currentDate.getMonth() / 3) + 1;
   };
 
   return (
-    <ScreenContainer className="p-0">
-      {/* Переключатель режимов */}
-      <View className="flex-row px-4 pt-4 pb-2 gap-2 justify-center">
-        <TouchableOpacity
-          onPress={() => setCalendarMode("week")}
-          className="px-4 py-2 rounded-lg border"
-          style={getModeButtonStyle("week")}
-        >
-          <Text className="text-xs font-semibold" style={getModeButtonTextStyle("week")}>
-            Неделя
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setCalendarMode("month")}
-          className="px-4 py-2 rounded-lg border"
-          style={getModeButtonStyle("month")}
-        >
-          <Text className="text-xs font-semibold" style={getModeButtonTextStyle("month")}>
-            Месяц
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setCalendarMode("quarter")}
-          className="px-4 py-2 rounded-lg border"
-          style={getModeButtonStyle("quarter")}
-        >
-          <Text className="text-xs font-semibold" style={getModeButtonTextStyle("quarter")}>
-            Квартал
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setCalendarMode("year")}
-          className="px-4 py-2 rounded-lg border"
-          style={getModeButtonStyle("year")}
-        >
-          <Text className="text-xs font-semibold" style={getModeButtonTextStyle("year")}>
-            Год
-          </Text>
-        </TouchableOpacity>
-      </View>
+    <ScreenContainer className="p-0 flex-1">
+      {/* Заголовок с переключателем режимов */}
+      <CalendarHeader
+        mode={calendarMode}
+        onModeChange={setCalendarMode}
+        currentDate={currentDate}
+        onPreviousPeriod={handlePreviousPeriod}
+        onNextPeriod={handleNextPeriod}
+        onToday={handleToday}
+      />
 
       {/* Содержимое календаря */}
-      <View className="flex-1">
+      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         {calendarMode === "month" && (
-          <ScrollView showsVerticalScrollIndicator={false} className="px-4">
-            {/* Навигация по месяцам */}
-            <View className="flex-row justify-between items-center mb-6 pt-4">
-              <TouchableOpacity onPress={previousMonth}>
-                <Text className="text-2xl text-primary font-bold">←</Text>
-              </TouchableOpacity>
-              <Text className="text-2xl font-bold text-foreground capitalize">{monthName}</Text>
-              <TouchableOpacity onPress={nextMonth}>
-                <Text className="text-2xl text-primary font-bold">→</Text>
-              </TouchableOpacity>
-            </View>
-
+          <View className="px-4">
             {/* День недели */}
-            <View className="flex-row mb-2">
+            <View className="flex-row mb-2 mt-4">
               {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((day, index) => (
                 <View key={index} className="flex-1 items-center py-2">
                   <Text className="text-xs font-semibold text-muted">{day}</Text>
@@ -369,12 +330,10 @@ export default function CalendarScreen() {
 
             {/* Календарь */}
             <View className="flex-row flex-wrap">
-              {/* Пустые дни в начале месяца */}
               {emptyDays.map((_, index) => (
                 <View key={`empty-${index}`} className="w-1/7 aspect-square" />
               ))}
 
-              {/* Дни месяца */}
               {days.map((day) => {
                 const dayInfo = getDayType(day);
                 const colors_info = getTypeColor(dayInfo);
@@ -391,98 +350,19 @@ export default function CalendarScreen() {
                     onPress={() => handleDayPress(day)}
                     onLongPress={() => handleDayLongPress(day)}
                   >
-                    <View className="items-center justify-center">
-                      <Text className="text-sm font-semibold text-foreground">{day}</Text>
-                    </View>
+                    <Text className="text-sm font-semibold text-foreground">{day}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
-
-            {/* Легенда */}
-            <View className="mt-8 p-4 rounded-lg border border-border mb-6" style={{ backgroundColor: colors.surface }}>
-              <Text className="text-sm font-semibold text-foreground mb-4">Легенда</Text>
-
-              {/* Рабочий день */}
-              <View className="flex-row items-center mb-3">
-                <View
-                  className="w-5 h-5 rounded"
-                  style={{
-                    backgroundColor: colors.success + "20",
-                    borderWidth: 1.5,
-                    borderColor: colors.success,
-                  }}
-                />
-                <Text className="text-xs text-foreground ml-3">Рабочий день</Text>
-              </View>
-
-              {/* Выходной */}
-              <View className="flex-row items-center mb-3">
-                <View
-                  className="w-5 h-5 rounded"
-                  style={{
-                    backgroundColor: colors.muted + "20",
-                    borderWidth: 1.5,
-                    borderColor: colors.muted,
-                  }}
-                />
-                <Text className="text-xs text-foreground ml-3">Выходной (Сб, Вс)</Text>
-              </View>
-
-              {/* Праздничный день */}
-              <View className="flex-row items-center mb-3">
-                <View
-                  className="w-5 h-5 rounded"
-                  style={{
-                    backgroundColor: colors.error + "20",
-                    borderWidth: 1.5,
-                    borderColor: colors.error,
-                  }}
-                />
-                <Text className="text-xs text-foreground ml-3">Праздничный день</Text>
-              </View>
-
-              {/* Отпуск */}
-              <View className="flex-row items-center mb-3">
-                <View
-                  className="w-5 h-5 rounded"
-                  style={{
-                    backgroundColor: colors.primary + "20",
-                    borderWidth: 1.5,
-                    borderColor: colors.primary,
-                  }}
-                />
-                <Text className="text-xs text-foreground ml-3">Отпуск</Text>
-              </View>
-
-              {/* Больничный */}
-              <View className="flex-row items-center">
-                <View
-                  className="w-5 h-5 rounded"
-                  style={{
-                    backgroundColor: colors.warning + "20",
-                    borderWidth: 1.5,
-                    borderColor: colors.warning,
-                  }}
-                />
-                <Text className="text-xs text-foreground ml-3">Больничный лист</Text>
-              </View>
-            </View>
-
-            {/* Информация */}
-            <View className="mt-6 p-4 rounded-lg mb-6" style={{ backgroundColor: colors.surface }}>
-              <Text className="text-xs text-muted">
-                Календарь показывает выходные дни (суббота и воскресенье), праздничные дни из загруженного производственного календаря и ваши периоды отпусков.
-              </Text>
-            </View>
-          </ScrollView>
+          </View>
         )}
 
         {calendarMode === "week" && (
           <WeekCalendarView
             currentDate={currentDate}
-            onPreviousWeek={previousWeek}
-            onNextWeek={nextWeek}
+            onPreviousWeek={() => handlePreviousPeriod()}
+            onNextWeek={() => handleNextPeriod()}
             holidays={holidays}
             vacationPeriods={vacationPeriods}
             onDayPress={handleDayPress}
@@ -493,8 +373,8 @@ export default function CalendarScreen() {
           <QuarterCalendarView
             currentYear={currentDate.getFullYear()}
             currentQuarter={getCurrentQuarter()}
-            onPreviousQuarter={previousQuarter}
-            onNextQuarter={nextQuarter}
+            onPreviousQuarter={() => handlePreviousPeriod()}
+            onNextQuarter={() => handleNextPeriod()}
             holidays={holidays}
             vacationPeriods={vacationPeriods}
             onDayPress={handleDayPress}
@@ -504,8 +384,8 @@ export default function CalendarScreen() {
         {calendarMode === "year" && (
           <YearCalendarView
             currentYear={currentDate.getFullYear()}
-            onPreviousYear={previousYear}
-            onNextYear={nextYear}
+            onPreviousYear={() => handlePreviousPeriod()}
+            onNextYear={() => handleNextPeriod()}
             holidays={holidays}
             vacationPeriods={vacationPeriods}
             onMonthPress={(month) => {
@@ -514,9 +394,77 @@ export default function CalendarScreen() {
             }}
           />
         )}
-      </View>
 
-      {/* Модальное окно для добавления отпуска */}
+        {/* Статистика периода */}
+        {periodStats && <CalendarStatsCards stats={periodStats} mode={calendarMode} />}
+
+        {/* Легенда */}
+        <View className="mt-8 mx-4 p-4 rounded-lg border border-border mb-6" style={{ backgroundColor: colors.surface }}>
+          <Text className="text-sm font-semibold text-foreground mb-4">Легенда</Text>
+
+          <View className="flex-row items-center mb-3">
+            <View
+              className="w-5 h-5 rounded"
+              style={{
+                backgroundColor: colors.success + "20",
+                borderWidth: 1.5,
+                borderColor: colors.success,
+              }}
+            />
+            <Text className="text-xs text-foreground ml-3">Рабочий день</Text>
+          </View>
+
+          <View className="flex-row items-center mb-3">
+            <View
+              className="w-5 h-5 rounded"
+              style={{
+                backgroundColor: colors.muted + "20",
+                borderWidth: 1.5,
+                borderColor: colors.muted,
+              }}
+            />
+            <Text className="text-xs text-foreground ml-3">Выходной (Сб, Вс)</Text>
+          </View>
+
+          <View className="flex-row items-center mb-3">
+            <View
+              className="w-5 h-5 rounded"
+              style={{
+                backgroundColor: colors.error + "20",
+                borderWidth: 1.5,
+                borderColor: colors.error,
+              }}
+            />
+            <Text className="text-xs text-foreground ml-3">Праздничный день</Text>
+          </View>
+
+          <View className="flex-row items-center mb-3">
+            <View
+              className="w-5 h-5 rounded"
+              style={{
+                backgroundColor: colors.primary + "20",
+                borderWidth: 1.5,
+                borderColor: colors.primary,
+              }}
+            />
+            <Text className="text-xs text-foreground ml-3">Отпуск</Text>
+          </View>
+
+          <View className="flex-row items-center">
+            <View
+              className="w-5 h-5 rounded"
+              style={{
+                backgroundColor: colors.warning + "20",
+                borderWidth: 1.5,
+                borderColor: colors.warning,
+              }}
+            />
+            <Text className="text-xs text-foreground ml-3">Больничный лист</Text>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Модальные окна */}
       <AddVacationModal
         visible={modalVisible}
         selectedDate={selectedDate}
@@ -524,7 +472,6 @@ export default function CalendarScreen() {
         onAddVacation={handleAddVacation}
       />
 
-      {/* Модальное окно для редактирования отпуска */}
       <EditVacationModal
         visible={editModalVisible}
         period={selectedPeriod}
@@ -536,7 +483,6 @@ export default function CalendarScreen() {
         onDelete={handleDeleteVacation}
       />
 
-      {/* Модальное окно с деталями дня */}
       <DayDetailModal
         visible={dayDetailVisible}
         date={selectedDayForDetail}
