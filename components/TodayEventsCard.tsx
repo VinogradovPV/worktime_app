@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/use-colors';
 import { WorkDay, WorkEventType } from '@/shared/types/workday';
 import { WorkDayEventEditor } from '@/components/WorkDayEventEditor';
-import { saveWorkDay } from '@/lib/storage/workdayService';
+import { saveWorkDay, rebuildWorkDayFromEvents } from '@/lib/storage/workdayService';
 
 interface TodayEventsCardProps {
   workDay: WorkDay | null;
@@ -58,7 +58,11 @@ export function TodayEventsCard({ workDay, onWorkDayUpdated }: TodayEventsCardPr
   };
 
   const handleSave = async (updated: WorkDay) => {
-    await saveWorkDay(updated);
+    // Пересчитываем workStartAt, workEndAt, breakIntervals, temporaryExitIntervals
+    // и status из актуального массива events, чтобы таймер на главном экране
+    // динамически пересчитался после редактирования.
+    const rebuilt = rebuildWorkDayFromEvents(updated);
+    await saveWorkDay(rebuilt);
     onWorkDayUpdated?.();
     setEditorVisible(false);
   };

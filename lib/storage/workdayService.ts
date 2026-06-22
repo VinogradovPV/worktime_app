@@ -264,3 +264,98 @@ export async function clearAllWorkDays(): Promise<void> {
     throw error;
   }
 }
+
+/**
+ * Перестраивает поля WorkDay (workStartAt, workEndAt, breakIntervals,
+ * temporaryExitIntervals, status) из массива events.
+ *
+ * Используется после ручного редактирования событий, чтобы таймер
+ * на главном экране пересчитался корректно.
+ */
+export function rebuildWorkDayFromEvents(workDay: WorkDay): WorkDay {
+  // Сортируем события по времени
+  const sorted = [...workDay.events].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  let workStartAt: string | null = null;
+  let workEndAt: string | null = null;
+  const breakIntervals: TimeInterval[] = [];
+  const temporaryExitIntervals: TimeInterval[] = [];
+
+  let breakCounter = 0;
+  let exitCounter = 0;
+
+  for (const event of sorted) {
+    switch (event.type) {
+      case 'work_start':
+        workStartAt = event.timestamp;
+        workEndAt = null; // сбрасываем если был повторный старт
+        break;
+      case 'work_end':
+        workEndAt = event.timestamp;
+        break;
+      case 'break_start': {
+        breakCounter++;
+        breakIntervals.push({
+          id: `rebuilt-break-${breakCounter}`,
+          type: 'break',
+          startAt: event.timestamp,
+          endAt: null,
+        });
+        break;
+      }
+      case 'break_end': {
+        // Закрываем последний открытый перерыв
+        const openBreak = [...breakIntervals].reverse().find((b) => b.endAt === null);
+        if (openBreak) {
+          openBreak.endAt = event.timestamp;
+        }
+        break;
+      }
+      case 'temporary_exit_start': {
+        exitCounter++;
+        temporaryExitIntervals.push({
+          id: `rebuilt-exit-${exitCounter}`,
+          type: 'temporary_exit',
+          startAt: event.timestamp,
+          endAt: null,
+        });
+        break;
+      }
+      case 'temporary_exit_end': {
+        // Закрываем последний открытый выход
+        const openExit = [...temporaryExitIntervals].reverse().find((e) => e.endAt === null);
+        if (openExit) {
+          openExit.endAt = event.timestamp;
+        }
+        break;
+      }
+    }
+  }
+
+  // Определяем статус на основе событий
+  let status: WorkDay['status'] = 'not_started';
+  if (workStartAt) {
+    const hasOpenBreak = breakIntervals.some((b) => b.endAt === null);
+    const hasOpenExit = temporaryExitIntervals.some((e) => e.endAt === null);
+    if (workEndAt) {
+      status = 'completed';
+    } else if (hasOpenBreak) {
+      status = 'on_break';
+    } else if (hasOpenExit) {
+      status = 'on_temporary_exit';
+    } else {
+      status = 'working';
+    }
+  }
+
+  return {
+    ...workDay,
+    workStartAt,
+    workEndAt,
+    breakIntervals,
+    temporaryExitIntervals,
+    status,
+  };
+}

@@ -1,4 +1,4 @@
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { getDb } from "./_core/db";
 import { workDays, syncLogs, users, InsertWorkDay, InsertSyncLog, InsertUser } from "../drizzle/schema";
 
@@ -65,9 +65,12 @@ export async function upsertWorkDay(data: InsertWorkDay) {
 
     return existing.id;
   } else {
-    // Insert new
-    const result = await db.insert(workDays).values(data);
-    return (result as any).insertId || 0;
+    // Insert new — PostgreSQL supports RETURNING
+    const result = await db
+      .insert(workDays)
+      .values(data)
+      .returning({ id: workDays.id });
+    return result[0]?.id || 0;
   }
 }
 
@@ -120,8 +123,11 @@ export async function logSyncEvent(data: InsertSyncLog) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(syncLogs).values(data);
-  return (result as any).insertId || 0;
+  const result = await db
+    .insert(syncLogs)
+    .values(data)
+    .returning({ id: syncLogs.id });
+  return result[0]?.id || 0;
 }
 
 /**
@@ -135,7 +141,7 @@ export async function getUserSyncHistory(userId: number, limit: number = 100) {
     .select()
     .from(syncLogs)
     .where(eq(syncLogs.userId, userId))
-    .orderBy((t: any) => [t.createdAt])
+    .orderBy(desc(syncLogs.createdAt))
     .limit(limit);
 }
 
@@ -180,8 +186,11 @@ export async function upsertUser(data: Partial<InsertUser>) {
       .where(eq(users.openId, data.openId));
     return existing[0].id;
   } else {
-    const result = await db.insert(users).values(data as InsertUser);
-    return (result as any).insertId || 0;
+    const result = await db
+      .insert(users)
+      .values(data as InsertUser)
+      .returning({ id: users.id });
+    return result[0]?.id || 0;
   }
 }
 
@@ -201,7 +210,7 @@ export async function getLastSyncTime(userId: number) {
         eq(syncLogs.status, "success")
       )
     )
-    .orderBy((t: any) => [t.createdAt])
+    .orderBy(desc(syncLogs.createdAt))
     .limit(1);
 
   return result[0]?.createdAt || null;

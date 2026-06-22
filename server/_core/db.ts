@@ -1,13 +1,13 @@
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import * as schema from "../../drizzle/schema";
 
-let cachedDb: any = null;
-let pool: mysql.Pool | null = null;
+let cachedDb: ReturnType<typeof drizzle> | null = null;
+let pool: Pool | null = null;
 
 /**
  * Get database connection pool
- * Connects to the Manus-managed MySQL database
+ * Connects to the Yandex Cloud PostgreSQL database
  */
 export async function getDb() {
   if (cachedDb) {
@@ -17,18 +17,22 @@ export async function getDb() {
   try {
     // Create connection pool
     if (!pool) {
-      pool = mysql.createPool({
+      pool = new Pool({
         host: process.env.DB_HOST || "localhost",
-        user: process.env.DB_USER || "root",
+        port: parseInt(process.env.DB_PORT || "5432", 10),
+        user: process.env.DB_USER || "postgres",
         password: process.env.DB_PASSWORD || "",
         database: process.env.DB_NAME || "worktime",
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0,
+        ssl: {
+          rejectUnauthorized: false,
+        },
+        max: 10,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 5000,
       });
     }
 
-    const db = drizzle(pool, { schema, mode: "default" });
+    const db = drizzle(pool, { schema });
     cachedDb = db;
     return cachedDb;
   } catch (error) {

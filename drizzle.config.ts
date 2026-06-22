@@ -1,15 +1,21 @@
 import { defineConfig } from "drizzle-kit";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error("DATABASE_URL is required to run drizzle commands");
-}
+const host = process.env.DB_HOST || "localhost";
+const port = process.env.DB_PORT || "5432";
+const user = process.env.DB_USER || "postgres";
+const password = process.env.DB_PASSWORD || "";
+const database = process.env.DB_NAME || "worktime";
 
 export default defineConfig({
   schema: "./drizzle/schema.ts",
   out: "./drizzle",
-  dialect: "mysql",
+  dialect: "postgresql",
   dbCredentials: {
-    url: connectionString,
+    host,
+    port: parseInt(port, 10),
+    user,
+    password,
+    database,
+    ssl: false,
   },
 });

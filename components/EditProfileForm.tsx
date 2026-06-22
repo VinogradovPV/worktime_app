@@ -38,7 +38,6 @@ export function EditProfileForm({
   const [position, setPosition] = useState(profile?.position || "");
   const [selectedDepartmentId, setSelectedDepartmentId] = useState(profile?.departmentId || "");
   const [selectedInspectionId, setSelectedInspectionId] = useState(profile?.inspectionId || "");
-  const [language, setLanguage] = useState<"ru" | "en">(profile?.language || "ru");
   const [theme, setTheme] = useState<"light" | "dark" | "auto">(profile?.theme || "auto");
   const [isLoading, setIsLoading] = useState(false);
   const [newDepartmentName, setNewDepartmentName] = useState("");
@@ -48,7 +47,6 @@ export function EditProfileForm({
   const [departmentInspections, setDepartmentInspections] = useState<Inspection[]>([]);
   const [showDepartmentPicker, setShowDepartmentPicker] = useState(false);
   const [showInspectionPicker, setShowInspectionPicker] = useState(false);
-  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [avatar, setAvatar] = useState(profile?.avatar || "");
   const [showNormProgress, setShowNormProgress] = useState<boolean>(profile?.showNormProgress !== false);
@@ -73,7 +71,7 @@ export function EditProfileForm({
         position,
         departmentId: selectedDepartmentId,
         inspectionId: selectedInspectionId,
-        language,
+        language: "ru",
         theme,
         avatar,
         showNormProgress,
@@ -407,37 +405,7 @@ export function EditProfileForm({
         <View>
           <Text className="text-lg font-bold text-foreground mb-3">Настройки приложения</Text>
 
-          <Text className="text-sm font-semibold text-foreground mb-2">Язык</Text>
-          <TouchableOpacity
-            className="rounded-lg border p-3"
-            style={{ borderColor: colors.border, backgroundColor: colors.background }}
-            onPress={() => setShowLanguagePicker(!showLanguagePicker)}
-          >
-            <Text className="text-sm text-foreground">{language === "ru" ? "Русский" : "English"}</Text>
-          </TouchableOpacity>
-
-          {showLanguagePicker && (
-            <View className="mt-2 rounded-lg border" style={{ borderColor: colors.border }}>
-              {[
-                { label: "Русский", value: "ru" as const },
-                { label: "English", value: "en" as const },
-              ].map((item) => (
-                <TouchableOpacity
-                  key={item.value}
-                  className="p-3 border-b"
-                  style={{ borderColor: colors.border }}
-                  onPress={() => {
-                    setLanguage(item.value);
-                    setShowLanguagePicker(false);
-                  }}
-                >
-                  <Text className="text-sm text-foreground">{item.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          <Text className="text-sm font-semibold text-foreground mb-2 mt-3">Тема оформления</Text>
+          <Text className="text-sm font-semibold text-foreground mb-2">Тема оформления</Text>
           <TouchableOpacity
             className="rounded-lg border p-3"
             style={{ borderColor: colors.border, backgroundColor: colors.background }}
