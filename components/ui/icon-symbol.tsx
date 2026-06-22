@@ -31,6 +31,8 @@ const MAPPING = {
   "xmark.circle.fill": "cancel",
   "person.fill": "person",
   "person.crop.circle": "account-circle",
+  "waveform": "show-chart",
+  "chart.line.uptrend.xyaxis": "trending-up",
 } as IconMapping;
 
 /**

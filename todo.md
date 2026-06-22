@@ -779,3 +779,13 @@
 ### Информационные
 - [x] Удалить неиспользуемые компоненты: AnalyticsCalendar, VirtualizedDetailsList, external-link, hello-wave, parallax-scroll-view
 - [x] Проверить и исправить обрезание текста в AnimatedTimer при >10ч
+
+## Экран аналитики
+
+- [x] Добавить иконку `waveform` для вкладки аналитики в icon-symbol.tsx
+- [x] Подключить analytics.tsx как 5-ю вкладку в _layout.tsx
+- [x] Исправить transformOrigin в TrendChart (не поддерживается в React Native)
+- [x] Исправить FadeIn/FadeOut в SyncStatusIndicator (несовместимо с headerRight)
+- [x] Добавить пустое состояние в TrendChart при отсутствии данных
+- [x] Проверить корректность графиков TrendChart, WeeklyDistributionChart, ComparisonChart
+- [x] Проверить RecommendationCard

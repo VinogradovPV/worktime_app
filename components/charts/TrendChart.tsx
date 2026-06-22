@@ -36,6 +36,30 @@ export function TrendChart({ data, height = 250 }: TrendChartProps) {
   const minWork = Math.min(...data.map(d => d.workedMs));
   const range = maxWork - minWork || maxWork;
 
+  // Если все данные нулевые — показываем сообщение об отсутствии данных
+  if (maxWork === 0) {
+    return (
+      <View
+        style={{
+          height: chartHeight,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: colors.surface,
+          borderRadius: 12,
+          padding: 16,
+        }}
+      >
+        <Text style={{ fontSize: 32, marginBottom: 8 }}>📅</Text>
+        <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600', marginBottom: 4 }}>
+          Нет данных за период
+        </Text>
+        <Text style={{ color: colors.muted, fontSize: 12, textAlign: 'center' }}>
+          Начните работу, чтобы увидеть тренды рабочего времени
+        </Text>
+      </View>
+    );
+  }
+
   // Рассчитываем координаты точек
   const points = data.map((d, index) => {
     const x = padding + (index / (data.length - 1 || 1)) * (chartWidth - 2 * padding);
@@ -114,18 +138,25 @@ export function TrendChart({ data, height = 250 }: TrendChartProps) {
             const length = Math.sqrt(dx * dx + dy * dy);
             const angle = Math.atan2(dy, dx) * (180 / Math.PI);
 
+            // React Native не поддерживает transformOrigin.
+            // Линия рисуется от центра (left - length/2, top - 1),
+            // затем смещается translateX(length/2) чтобы левый конец
+            // совпадал с prevP.
             return (
               <View
                 key={i}
                 style={{
                   position: 'absolute',
                   left: prevP.x,
-                  top: prevP.y,
+                  top: prevP.y - 1,
                   width: length,
                   height: 2,
                   backgroundColor: colors.primary,
-                  transform: [{ rotate: `${angle}deg` }],
-                  transformOrigin: '0 0',
+                  transform: [
+                    { translateX: length / 2 },
+                    { rotate: `${angle}deg` },
+                    { translateX: -length / 2 },
+                  ],
                 }}
               />
             );

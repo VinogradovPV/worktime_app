@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import Animated, {
-  FadeIn,
-  FadeOut,
   withSpring,
   useSharedValue,
   useAnimatedStyle,
@@ -64,7 +62,7 @@ export function SyncStatusIndicator({
   };
 
   return (
-    <Animated.View entering={FadeIn} exiting={FadeOut}>
+    <Animated.View>
       <Pressable
         onPress={handleSyncPress}
         disabled={syncStatus.isSyncing}
