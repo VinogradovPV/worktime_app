@@ -10,13 +10,15 @@ import {
 import * as Haptics from 'expo-haptics';
 
 interface WeekMetrics {
-  avgWorkHours: number;       // Среднее время работы в день (в часах)
-  totalWorkHours: number;     // Всего часов за неделю
-  workedDays: number;         // Дней с данными
-  workdaysInCalendar: number; // Рабочих дней по календарю
-  trend: 'up' | 'down' | 'stable'; // Тренд по сравнению с прошлой неделей
-  trendPercent: number;       // Процент изменения
-  bestDay: string | null;     // Лучший день (самый продуктивный)
+  avgWorkHours: number;
+  totalWorkHours: number;
+  workedDays: number;
+  workdaysInCalendar: number;
+  trend: 'up' | 'down' | 'stable';
+  trendPercent: number;
+  bestDay: string | null;
+  normWeekMs: number;        // Норма за неделю (рабочих дней × 8ч)
+  totalWorkMs: number;       // Фактически отработано за неделю
 }
 
 function formatHours(ms: number): string {
@@ -45,18 +47,15 @@ export function WeeklyAnalyticsWidget() {
       const now = new Date();
       const year = now.getFullYear();
 
-      // Текущая неделя
       const weekStart = getPeriodStart(now, 'week' as any);
       const weekEnd = getPeriodEnd(now, 'week' as any);
       const currentWeekStats = await getDayStatsForPeriod(weekStart, weekEnd, year);
 
-      // Прошлая неделя
       const prevWeekEnd = new Date(weekStart);
       prevWeekEnd.setDate(prevWeekEnd.getDate() - 1);
       const prevWeekStart = getPeriodStart(prevWeekEnd, 'week' as any);
       const prevWeekStats = await getDayStatsForPeriod(prevWeekStart, prevWeekEnd, year);
 
-      // Считаем метрики текущей недели
       const workdays = currentWeekStats.filter(
         (d) => d.dayType === 'workday' || d.dayType === 'shortened_workday'
       );
@@ -64,7 +63,9 @@ export function WeeklyAnalyticsWidget() {
       const totalWorkMs = workedDays.reduce((sum, d) => sum + d.workedMs, 0);
       const avgWorkMs = workedDays.length > 0 ? totalWorkMs / workedDays.length : 0;
 
-      // Лучший день
+      // Норма недели = рабочих дней × 8ч
+      const normWeekMs = workdays.length * 8 * 3_600_000;
+
       let bestDay: string | null = null;
       if (workedDays.length > 0) {
         const best = workedDays.reduce((a, b) => (a.workedMs > b.workedMs ? a : b));
@@ -72,7 +73,6 @@ export function WeeklyAnalyticsWidget() {
         bestDay = DAY_NAMES_SHORT[d.getDay()];
       }
 
-      // Тренд: сравниваем среднее с прошлой неделей
       const prevWorked = prevWeekStats.filter((d) => d.workedMs > 0);
       const prevAvgMs =
         prevWorked.length > 0
@@ -95,6 +95,8 @@ export function WeeklyAnalyticsWidget() {
         trend,
         trendPercent: Math.abs(trendPercent),
         bestDay,
+        normWeekMs,
+        totalWorkMs,
       });
     } catch (err) {
       console.error('WeeklyAnalyticsWidget: ошибка загрузки', err);
@@ -126,12 +128,21 @@ export function WeeklyAnalyticsWidget() {
   }
 
   if (!metrics || (metrics.workedDays === 0 && metrics.workdaysInCalendar === 0)) {
-    return null; // Не показываем виджет если данных совсем нет
+    return null;
   }
 
   const trendIcon = metrics.trend === 'up' ? '↑' : metrics.trend === 'down' ? '↓' : '→';
   const trendColor =
     metrics.trend === 'up' ? colors.success : metrics.trend === 'down' ? colors.error : colors.muted;
+
+  const normProgress = metrics.normWeekMs > 0
+    ? Math.min(metrics.totalWorkMs / metrics.normWeekMs, 1)
+    : 0;
+  const normPercent = Math.round(normProgress * 100);
+  const normColor = normProgress >= 1 ? colors.success
+    : normProgress >= 0.75 ? colors.primary
+    : normProgress >= 0.5 ? colors.warning
+    : colors.muted;
 
   return (
     <Pressable
@@ -154,7 +165,7 @@ export function WeeklyAnalyticsWidget() {
       </View>
 
       {/* Три метрики */}
-      <View style={{ flexDirection: 'row', gap: 8 }}>
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
         {/* Среднее время */}
         <View
           style={{
@@ -165,7 +176,7 @@ export function WeeklyAnalyticsWidget() {
             alignItems: 'center',
           }}
         >
-          <Text style={{ fontSize: 18, fontWeight: '700', color: colors.primary }}>
+          <Text style={{ fontSize: 17, fontWeight: '700', color: colors.primary }}>
             {formatHours(metrics.avgWorkHours * 3_600_000)}
           </Text>
           <Text style={{ fontSize: 10, color: colors.muted, marginTop: 2, textAlign: 'center' }}>
@@ -183,16 +194,15 @@ export function WeeklyAnalyticsWidget() {
             alignItems: 'center',
           }}
         >
-          <Text style={{ fontSize: 18, fontWeight: '700', color: trendColor }}>
-            {trendIcon}
-            {metrics.trendPercent > 0 ? ` ${metrics.trendPercent}%` : ''}
+          <Text style={{ fontSize: 17, fontWeight: '700', color: trendColor }}>
+            {trendIcon}{metrics.trendPercent > 0 ? ` ${metrics.trendPercent}%` : ''}
           </Text>
           <Text style={{ fontSize: 10, color: colors.muted, marginTop: 2, textAlign: 'center' }}>
             к прошлой неделе
           </Text>
         </View>
 
-        {/* Лучший день / дней отработано */}
+        {/* Дней отработано */}
         <View
           style={{
             flex: 1,
@@ -204,7 +214,7 @@ export function WeeklyAnalyticsWidget() {
         >
           {metrics.bestDay ? (
             <>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: colors.success }}>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: colors.success }}>
                 {metrics.bestDay}
               </Text>
               <Text style={{ fontSize: 10, color: colors.muted, marginTop: 2, textAlign: 'center' }}>
@@ -213,7 +223,7 @@ export function WeeklyAnalyticsWidget() {
             </>
           ) : (
             <>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: colors.foreground }}>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: colors.foreground }}>
                 {metrics.workedDays}/{metrics.workdaysInCalendar}
               </Text>
               <Text style={{ fontSize: 10, color: colors.muted, marginTop: 2, textAlign: 'center' }}>
@@ -223,6 +233,37 @@ export function WeeklyAnalyticsWidget() {
           )}
         </View>
       </View>
+
+      {/* Прогресс-бар нормы недели */}
+      {metrics.normWeekMs > 0 && (
+        <View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+            <Text style={{ fontSize: 11, color: colors.muted }}>
+              {formatHours(metrics.totalWorkMs)} из {formatHours(metrics.normWeekMs)} нормы
+            </Text>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: normColor }}>
+              {normPercent}%
+            </Text>
+          </View>
+          <View
+            style={{
+              height: 4,
+              backgroundColor: colors.border,
+              borderRadius: 2,
+              overflow: 'hidden',
+            }}
+          >
+            <View
+              style={{
+                height: '100%',
+                width: `${normPercent}%`,
+                backgroundColor: normColor,
+                borderRadius: 2,
+              }}
+            />
+          </View>
+        </View>
+      )}
     </Pressable>
   );
 }

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Dimensions, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, Dimensions } from 'react-native';
 import { useColors } from '@/hooks/use-colors';
 import { WorkDay } from '@/shared/types/workday';
 import { calculateWorkDayStats, formatTime, formatTimeShort, getWorkDayStatusText, getWorkDayStatusColor } from '@/lib/storage/workdayStatsService';
@@ -11,18 +10,17 @@ interface WorkDayTimerProps {
   workDay: WorkDay | null;
 }
 
+const WORK_DAY_NORM_MS = 8 * 60 * 60 * 1000; // 8 часов
+
 export function WorkDayTimer({ workDay }: WorkDayTimerProps) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const [now, setNow] = useState(new Date());
   const screenWidth = Dimensions.get('window').width;
 
-  // Обновляем текущее время каждую секунду
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(new Date());
     }, 1000);
-
     return () => clearInterval(interval);
   }, []);
 
@@ -34,85 +32,162 @@ export function WorkDayTimer({ workDay }: WorkDayTimerProps) {
   const statusText = getWorkDayStatusText(workDay.status);
   const statusColor = getWorkDayStatusColor(workDay.status);
 
-  // Получаем активный перерыв или выход
   const activeBreak = getActiveBreakInterval(workDay);
   const activeExit = getActiveTemporaryExitInterval(workDay);
 
-  // Вычисляем время активного перерыва/выхода
   let activeIntervalMs = 0;
   if (activeBreak) {
-    const startTime = new Date(activeBreak.startAt);
-    activeIntervalMs = now.getTime() - startTime.getTime();
+    activeIntervalMs = now.getTime() - new Date(activeBreak.startAt).getTime();
   } else if (activeExit) {
-    const startTime = new Date(activeExit.startAt);
-    activeIntervalMs = now.getTime() - startTime.getTime();
+    activeIntervalMs = now.getTime() - new Date(activeExit.startAt).getTime();
   }
 
+  // Прогресс нормы рабочего дня (0..1)
+  const normProgress = Math.min(stats.totalWorkMs / WORK_DAY_NORM_MS, 1);
+  const normPercent = Math.round(normProgress * 100);
+  const normColor = normProgress >= 1 ? colors.success : normProgress >= 0.75 ? colors.primary : normProgress >= 0.5 ? colors.warning : colors.muted;
+
+  // Размер таймера — больше на главном экране
+  const timerSize = Math.min(screenWidth - 64, 240);
+
   return (
-    <View className="gap-6">
+    <View style={{ gap: 20 }}>
       {/* Статус */}
-      <View className="items-center gap-2">
-        <Text className="text-sm text-muted">Статус</Text>
+      <View style={{ alignItems: 'center', gap: 6 }}>
         <View
-          className="px-4 py-2 rounded-full"
-          style={{ backgroundColor: `${statusColor}20` }}
+          style={{
+            paddingHorizontal: 16,
+            paddingVertical: 6,
+            borderRadius: 20,
+            backgroundColor: `${statusColor}20`,
+          }}
         >
-          <Text
-            className="font-semibold text-base"
-            style={{ color: statusColor }}
-          >
+          <Text style={{ fontWeight: '600', fontSize: 15, color: statusColor }}>
             {statusText}
           </Text>
         </View>
       </View>
 
-      {/* Главный таймер */}
-      <View className="items-center gap-3">
-        <Text className="text-sm text-muted">Отработано</Text>
-        <AnimatedTimer 
-          time={formatTime(stats.totalWorkMs)} 
+      {/* Главный таймер — увеличен */}
+      <View style={{ alignItems: 'center', gap: 8 }}>
+        <AnimatedTimer
+          time={formatTime(stats.totalWorkMs)}
           isRunning={workDay.status === 'working'}
           status={
             workDay.status === 'working' ? 'working' :
             workDay.status === 'on_break' ? 'break' :
             workDay.status === 'on_temporary_exit' ? 'exit' : 'idle'
           }
-          size={Math.min(screenWidth - 32, 200)}
+          size={timerSize}
         />
-        <Text className="text-lg font-semibold text-foreground">
-          {formatTimeShort(stats.totalWorkMs)}
-        </Text>
       </View>
 
-      {/* Дополнительный таймер для активного перерыва/выхода */}
+      {/* Прогресс нормы рабочего дня */}
+      {workDay.status !== 'not_started' && (
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderRadius: 12,
+            padding: 14,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.muted }}>
+              Норма рабочего дня
+            </Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: normColor }}>
+              {normPercent}% · {formatTimeShort(stats.totalWorkMs)} / 8ч
+            </Text>
+          </View>
+          <View
+            style={{
+              height: 6,
+              backgroundColor: colors.border,
+              borderRadius: 3,
+              overflow: 'hidden',
+            }}
+          >
+            <View
+              style={{
+                height: '100%',
+                width: `${normPercent}%`,
+                backgroundColor: normColor,
+                borderRadius: 3,
+              }}
+            />
+          </View>
+        </View>
+      )}
+
+      {/* Активный перерыв/выход */}
       {(activeBreak || activeExit) && (
-        <View className="items-center gap-2 bg-surface rounded-lg p-4">
-          <Text className="text-sm text-muted">
-            {activeBreak ? 'Перерыв' : 'Временный выход'}
+        <View
+          style={{
+            alignItems: 'center',
+            gap: 4,
+            backgroundColor: colors.surface,
+            borderRadius: 12,
+            padding: 14,
+          }}
+        >
+          <Text style={{ fontSize: 12, color: colors.muted }}>
+            {activeBreak ? '⏸ Перерыв' : '↗ Временный выход'}
           </Text>
-          <Text className="text-3xl font-bold text-foreground">
+          <Text style={{ fontSize: 28, fontWeight: '700', color: colors.foreground }}>
             {formatTime(activeIntervalMs)}
           </Text>
         </View>
       )}
 
-      {/* Статистика */}
-      <View className="flex-row gap-3">
-        <View className="flex-1 bg-surface rounded-lg p-4 items-center" style={{ borderColor: colors.border, borderWidth: 1 }}>
-          <Text className="text-xs font-semibold text-muted mb-2">Перерывы</Text>
-          <Text className="text-xl font-bold text-foreground">
+      {/* Статистика — три карточки */}
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: colors.surface,
+            borderRadius: 12,
+            padding: 12,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          <Text style={{ fontSize: 10, fontWeight: '600', color: colors.muted, marginBottom: 4 }}>Перерывы</Text>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: colors.foreground }}>
             {formatTimeShort(stats.totalBreakMs)}
           </Text>
         </View>
-        <View className="flex-1 bg-surface rounded-lg p-4 items-center" style={{ borderColor: colors.border, borderWidth: 1 }}>
-          <Text className="text-xs font-semibold text-muted mb-2">Выходы</Text>
-          <Text className="text-xl font-bold text-foreground">
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: colors.surface,
+            borderRadius: 12,
+            padding: 12,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          <Text style={{ fontSize: 10, fontWeight: '600', color: colors.muted, marginBottom: 4 }}>Выходы</Text>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: colors.foreground }}>
             {formatTimeShort(stats.totalTemporaryExitMs)}
           </Text>
         </View>
-        <View className="flex-1 bg-surface rounded-lg p-4 items-center" style={{ borderColor: colors.border, borderWidth: 1 }}>
-          <Text className="text-xs font-semibold text-muted mb-2">95% времени</Text>
-          <Text className="text-xl font-bold text-foreground">
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: colors.surface,
+            borderRadius: 12,
+            padding: 12,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          <Text style={{ fontSize: 10, fontWeight: '600', color: colors.muted, marginBottom: 4 }}>95% нормы</Text>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: colors.foreground }}>
             {formatTimeShort(stats.work95Ms)}
           </Text>
         </View>

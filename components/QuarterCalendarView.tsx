@@ -2,6 +2,7 @@ import { View, Text, TouchableOpacity, ScrollView } from "react-native";
 import { useColors } from "@/hooks/use-colors";
 import { useState, useEffect } from "react";
 import { QuarterMonthCard } from "./QuarterMonthCard";
+import { getPeriodStats } from "@/lib/storage/reportStatsService";
 
 interface QuarterCalendarViewProps {
   currentYear: number;
@@ -13,6 +14,23 @@ interface QuarterCalendarViewProps {
   onMonthPress?: (month: number) => void;
 }
 
+interface MonthData {
+  month: number;
+  monthName: string;
+  workdays: number;
+  weekends: number;
+  holidays: number;
+  vacation: number;
+  workedDays: number;
+  workedHours: number;
+  requiresCheck: number;
+}
+
+const MONTH_NAMES = [
+  "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+  "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+];
+
 export function QuarterCalendarView({
   currentYear,
   currentQuarter,
@@ -23,101 +41,61 @@ export function QuarterCalendarView({
   onMonthPress,
 }: QuarterCalendarViewProps) {
   const colors = useColors();
-  const [monthStats, setMonthStats] = useState<any[]>([]);
+  const [monthStats, setMonthStats] = useState<MonthData[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    calculateMonthStats();
+    loadMonthStats();
   }, [currentYear, currentQuarter, holidays, vacationPeriods]);
 
-  const calculateMonthStats = () => {
-    const monthNames = [
-      "Январь",
-      "Февраль",
-      "Март",
-      "Апрель",
-      "Май",
-      "Июнь",
-      "Июль",
-      "Август",
-      "Сентябрь",
-      "Октябрь",
-      "Ноябрь",
-      "Декабрь",
-    ];
+  const loadMonthStats = async () => {
+    setLoading(true);
+    try {
+      const startMonth = (currentQuarter - 1) * 3;
+      const results: MonthData[] = [];
 
-    const startMonth = (currentQuarter - 1) * 3;
-    const stats = [];
+      for (let i = 0; i < 3; i++) {
+        const month = startMonth + i;
+        const startDate = new Date(currentYear, month, 1);
+        const endDate = new Date(currentYear, month + 1, 0);
 
-    for (let i = 0; i < 3; i++) {
-      const month = startMonth + i;
-      const daysInMonth = new Date(currentYear, month + 1, 0).getDate();
-      let workdays = 0;
-      let weekends = 0;
-      let holidays_count = 0;
-      let vacation_days = 0;
+        const stats = await getPeriodStats(startDate, endDate, currentYear);
 
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(currentYear, month, day);
-        const dateStr = formatDate(currentYear, month, day);
-        const dayOfWeek = date.getDay();
-
-        if (dayOfWeek === 0 || dayOfWeek === 6) {
-          weekends++;
-        } else if (holidays.includes(dateStr)) {
-          holidays_count++;
-        } else {
-          let isVacation = false;
-          for (const period of vacationPeriods) {
-            const startDate = new Date(period.startDate);
-            const endDate = new Date(period.endDate);
-            if (date >= startDate && date <= endDate) {
-              vacation_days++;
-              isVacation = true;
-              break;
-            }
-          }
-          if (!isVacation) {
-            workdays++;
-          }
-        }
+        results.push({
+          month: month + 1,
+          monthName: MONTH_NAMES[month],
+          workdays: stats.workdaysInCalendar,
+          weekends: stats.weekends,
+          holidays: stats.holidays,
+          vacation: stats.vacationDays,
+          workedDays: stats.workedDays,
+          workedHours: Math.round(stats.totalWorkedMs / 3_600_000 * 10) / 10,
+          requiresCheck: stats.requiresCheckDays,
+        });
       }
 
-      stats.push({
-        month: month + 1,
-        monthName: monthNames[month],
-        workdays,
-        weekends,
-        holidays: holidays_count,
-        vacation: vacation_days,
-        workedDays: 0, // TODO: получить из workdayService
-        workedHours: 0, // TODO: получить из workdayService
-      });
+      setMonthStats(results);
+    } catch (err) {
+      console.error("QuarterCalendarView: ошибка загрузки", err);
+    } finally {
+      setLoading(false);
     }
-
-    setMonthStats(stats);
   };
 
-  const formatDate = (year: number, month: number, day: number): string => {
-    return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-  };
+  const getQuarterLabel = () => `Q${currentQuarter} ${currentYear}`;
 
-  const getQuarterLabel = () => {
-    return `Q${currentQuarter} ${currentYear}`;
-  };
-
-  const getTotalStats = () => {
-    return monthStats.reduce(
-      (acc, month) => ({
-        workdays: acc.workdays + month.workdays,
-        weekends: acc.weekends + month.weekends,
-        holidays: acc.holidays + month.holidays,
-        vacation: acc.vacation + month.vacation,
-      }),
-      { workdays: 0, weekends: 0, holidays: 0, vacation: 0 }
-    );
-  };
-
-  const totalStats = getTotalStats();
+  const totalStats = monthStats.reduce(
+    (acc, m) => ({
+      workdays: acc.workdays + m.workdays,
+      weekends: acc.weekends + m.weekends,
+      holidays: acc.holidays + m.holidays,
+      vacation: acc.vacation + m.vacation,
+      workedDays: acc.workedDays + m.workedDays,
+      workedHours: acc.workedHours + m.workedHours,
+      requiresCheck: acc.requiresCheck + m.requiresCheck,
+    }),
+    { workdays: 0, weekends: 0, holidays: 0, vacation: 0, workedDays: 0, workedHours: 0, requiresCheck: 0 }
+  );
 
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
@@ -134,98 +112,133 @@ export function QuarterCalendarView({
 
       {/* Карточки месяцев */}
       <View className="px-4 mb-6">
-        {monthStats.map((month) => (
-          <QuarterMonthCard
-            key={month.month}
-            monthName={month.monthName}
-            month={month.month}
-            year={currentYear}
-            stats={{
-              workdays: month.workdays,
-              weekends: month.weekends,
-              holidays: month.holidays,
-              vacation: month.vacation,
-              workedDays: month.workedDays,
-              workedHours: month.workedHours,
-            }}
-            onPress={() => onMonthPress?.(month.month)}
-          />
-        ))}
+        {loading ? (
+          <View style={{ padding: 32, alignItems: "center" }}>
+            <Text style={{ color: colors.muted, fontSize: 13 }}>Загрузка данных...</Text>
+          </View>
+        ) : (
+          monthStats.map((month) => (
+            <QuarterMonthCard
+              key={month.month}
+              monthName={month.monthName}
+              month={month.month}
+              year={currentYear}
+              stats={{
+                workdays: month.workdays,
+                weekends: month.weekends,
+                holidays: month.holidays,
+                vacation: month.vacation,
+                workedDays: month.workedDays,
+                workedHours: month.workedHours,
+                requiresCheck: month.requiresCheck,
+              }}
+              onPress={() => onMonthPress?.(month.month)}
+            />
+          ))
+        )}
       </View>
 
       {/* Объединённая статистика квартала */}
-      <View className="mx-4 p-4 rounded-lg mb-6 border" style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
+      <View
+        className="mx-4 p-4 rounded-xl mb-6 border"
+        style={{ backgroundColor: colors.surface, borderColor: colors.border }}
+      >
         <Text className="text-sm font-semibold text-foreground mb-4">Статистика квартала</Text>
-        <View className="flex-row justify-between">
-          <View className="items-center flex-1">
-            <Text className="text-xs text-muted mb-1">Рабочих дней</Text>
+        <View className="flex-row flex-wrap gap-y-4">
+          <View className="items-center" style={{ width: "25%" }}>
+            <Text className="text-xs text-muted mb-1 text-center">Рабочих{"\n"}дней</Text>
             <Text className="text-xl font-bold text-success">{totalStats.workdays}</Text>
           </View>
-          <View className="items-center flex-1">
-            <Text className="text-xs text-muted mb-1">Выходных</Text>
+          <View className="items-center" style={{ width: "25%" }}>
+            <Text className="text-xs text-muted mb-1 text-center">Выходных</Text>
             <Text className="text-xl font-bold text-muted">{totalStats.weekends}</Text>
           </View>
-          <View className="items-center flex-1">
-            <Text className="text-xs text-muted mb-1">Праздников</Text>
+          <View className="items-center" style={{ width: "25%" }}>
+            <Text className="text-xs text-muted mb-1 text-center">Праздников</Text>
             <Text className="text-xl font-bold text-error">{totalStats.holidays}</Text>
           </View>
+          <View className="items-center" style={{ width: "25%" }}>
+            <Text className="text-xs text-muted mb-1 text-center">Отработано{"\n"}дней</Text>
+            <Text className="text-xl font-bold text-primary">{totalStats.workedDays}</Text>
+          </View>
+          <View className="items-center" style={{ width: "25%" }}>
+            <Text className="text-xs text-muted mb-1 text-center">Часов</Text>
+            <Text className="text-xl font-bold text-foreground">{totalStats.workedHours}ч</Text>
+          </View>
           {totalStats.vacation > 0 && (
-            <View className="items-center flex-1">
-              <Text className="text-xs text-muted mb-1">Отпусков</Text>
+            <View className="items-center" style={{ width: "25%" }}>
+              <Text className="text-xs text-muted mb-1 text-center">Отпусков</Text>
               <Text className="text-xl font-bold text-primary">{totalStats.vacation}</Text>
             </View>
           )}
+          {totalStats.requiresCheck > 0 && (
+            <View className="items-center" style={{ width: "25%" }}>
+              <Text className="text-xs text-muted mb-1 text-center">Требует{"\n"}проверки</Text>
+              <Text className="text-xl font-bold text-warning">{totalStats.requiresCheck}</Text>
+            </View>
+          )}
         </View>
+
+        {/* Прогресс-бар квартала */}
+        {totalStats.workdays > 0 && (
+          <View style={{ marginTop: 16 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+              <Text style={{ fontSize: 11, color: colors.muted }}>
+                Отработано {totalStats.workedDays} из {totalStats.workdays} рабочих дней
+              </Text>
+              <Text style={{ fontSize: 11, color: colors.primary, fontWeight: "600" }}>
+                {Math.round((totalStats.workedDays / totalStats.workdays) * 100)}%
+              </Text>
+            </View>
+            <View
+              style={{
+                height: 6,
+                backgroundColor: colors.border,
+                borderRadius: 3,
+                overflow: "hidden",
+              }}
+            >
+              <View
+                style={{
+                  height: "100%",
+                  width: `${Math.min((totalStats.workedDays / totalStats.workdays) * 100, 100)}%`,
+                  backgroundColor: colors.primary,
+                  borderRadius: 3,
+                }}
+              />
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Компактная легенда */}
-      <View className="mx-4 p-4 rounded-lg mb-6 border" style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
+      <View
+        className="mx-4 p-4 rounded-xl mb-6 border"
+        style={{ backgroundColor: colors.surface, borderColor: colors.border }}
+      >
         <Text className="text-sm font-semibold text-foreground mb-3">Легенда</Text>
-        <View className="gap-2">
-          <View className="flex-row items-center gap-2">
-            <View
-              className="w-4 h-4 rounded-sm"
-              style={{
-                backgroundColor: colors.success + "30",
-                borderWidth: 1,
-                borderColor: colors.success,
-              }}
-            />
-            <Text className="text-xs text-foreground">Рабочий день</Text>
-          </View>
-          <View className="flex-row items-center gap-2">
-            <View
-              className="w-4 h-4 rounded-sm"
-              style={{
-                backgroundColor: colors.muted + "30",
-                borderWidth: 1,
-                borderColor: colors.muted,
-              }}
-            />
-            <Text className="text-xs text-foreground">Выходной</Text>
-          </View>
-          <View className="flex-row items-center gap-2">
-            <View
-              className="w-4 h-4 rounded-sm"
-              style={{
-                backgroundColor: colors.error + "30",
-                borderWidth: 1,
-                borderColor: colors.error,
-              }}
-            />
-            <Text className="text-xs text-foreground">Праздник</Text>
-          </View>
-          <View className="flex-row items-center gap-2">
-            <View
-              className="w-4 h-4 rounded-sm"
-              style={{
-                backgroundColor: colors.primary + "30",
-                borderWidth: 1,
-                borderColor: colors.primary,
-              }}
-            />
-            <Text className="text-xs text-foreground">Отпуск</Text>
-          </View>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          {[
+            { color: colors.success, label: "Рабочий день" },
+            { color: colors.muted, label: "Выходной" },
+            { color: colors.error, label: "Праздник" },
+            { color: colors.primary, label: "Отпуск" },
+            { color: colors.warning, label: "Требует проверки" },
+          ].map(({ color, label }) => (
+            <View key={label} style={{ flexDirection: "row", alignItems: "center", gap: 6, marginRight: 8 }}>
+              <View
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: 3,
+                  backgroundColor: color + "30",
+                  borderWidth: 1,
+                  borderColor: color,
+                }}
+              />
+              <Text style={{ fontSize: 11, color: colors.foreground }}>{label}</Text>
+            </View>
+          ))}
         </View>
       </View>
     </ScrollView>

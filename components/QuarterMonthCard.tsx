@@ -9,6 +9,7 @@ interface MonthStats {
   vacation: number;
   workedDays: number;
   workedHours: number;
+  requiresCheck?: number;
 }
 
 interface QuarterMonthCardProps {
@@ -28,66 +29,117 @@ export function QuarterMonthCard({
 }: QuarterMonthCardProps) {
   const colors = useColors();
 
+  const progressPercent = stats.workdays > 0
+    ? Math.min(Math.round((stats.workedDays / stats.workdays) * 100), 100)
+    : 0;
+
+  const progressColor = progressPercent >= 100 ? colors.success
+    : progressPercent >= 75 ? colors.primary
+    : progressPercent >= 50 ? colors.warning
+    : colors.muted;
+
   return (
     <TouchableOpacity
       onPress={onPress}
-      className="rounded-lg p-4 mb-3 border"
       style={{
         backgroundColor: colors.surface,
         borderColor: colors.border,
         borderWidth: 1,
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 12,
       }}
       activeOpacity={0.7}
     >
       {/* Заголовок месяца */}
-      <View className="mb-4 pb-3 border-b" style={{ borderColor: colors.border }}>
-        <Text className="text-lg font-bold text-foreground">{monthName}</Text>
-        <Text className="text-xs text-muted">{month}/{year}</Text>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+        <View>
+          <Text style={{ fontSize: 17, fontWeight: "700", color: colors.foreground }}>{monthName}</Text>
+          <Text style={{ fontSize: 11, color: colors.muted }}>{month}/{year}</Text>
+        </View>
+        {stats.requiresCheck !== undefined && stats.requiresCheck > 0 && (
+          <View
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: 20,
+              backgroundColor: colors.warning + "20",
+            }}
+          >
+            <Text style={{ fontSize: 11, fontWeight: "600", color: colors.warning }}>
+              ⚠ {stats.requiresCheck} на проверке
+            </Text>
+          </View>
+        )}
       </View>
 
-      {/* Статистика месяца в 2 колонки */}
-      <View className="flex-row gap-6">
-        {/* Левая колонка */}
-        <View className="flex-1">
-          <View className="mb-3">
-            <Text className="text-xs text-muted mb-1">Рабочих дней</Text>
-            <Text className="text-lg font-bold text-success">{stats.workdays}</Text>
-          </View>
-          <View className="mb-3">
-            <Text className="text-xs text-muted mb-1">Выходных</Text>
-            <Text className="text-lg font-bold text-muted">{stats.weekends}</Text>
-          </View>
-          <View>
-            <Text className="text-xs text-muted mb-1">Праздников</Text>
-            <Text className="text-lg font-bold text-error">{stats.holidays}</Text>
-          </View>
+      {/* Статистика в 3 колонки */}
+      <View style={{ flexDirection: "row", marginBottom: 12 }}>
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 2 }}>Рабочих</Text>
+          <Text style={{ fontSize: 16, fontWeight: "700", color: colors.success }}>{stats.workdays}</Text>
         </View>
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 2 }}>Выходных</Text>
+          <Text style={{ fontSize: 16, fontWeight: "700", color: colors.muted }}>{stats.weekends}</Text>
+        </View>
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 2 }}>Праздников</Text>
+          <Text style={{ fontSize: 16, fontWeight: "700", color: colors.error }}>{stats.holidays}</Text>
+        </View>
+        {stats.vacation > 0 && (
+          <View style={{ flex: 1, alignItems: "center" }}>
+            <Text style={{ fontSize: 10, color: colors.muted, marginBottom: 2 }}>Отпуск</Text>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.primary }}>{stats.vacation}</Text>
+          </View>
+        )}
+      </View>
 
-        {/* Правая колонка */}
-        <View className="flex-1">
-          {stats.vacation > 0 && (
-            <View className="mb-3">
-              <Text className="text-xs text-muted mb-1">Отпусков</Text>
-              <Text className="text-lg font-bold text-primary">{stats.vacation}</Text>
-            </View>
-          )}
-          <View className="mb-3">
-            <Text className="text-xs text-muted mb-1">Отработано</Text>
-            <Text className="text-lg font-bold text-foreground">{stats.workedDays} дн</Text>
-          </View>
-          <View>
-            <Text className="text-xs text-muted mb-1">Часов</Text>
-            <Text className="text-lg font-bold text-foreground">{stats.workedHours}ч</Text>
-          </View>
+      {/* Отработано + прогресс-бар */}
+      <View
+        style={{
+          backgroundColor: colors.background,
+          borderRadius: 8,
+          padding: 10,
+          marginBottom: 10,
+        }}
+      >
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+          <Text style={{ fontSize: 11, color: colors.muted }}>
+            Отработано {stats.workedDays} из {stats.workdays} дней
+          </Text>
+          <Text style={{ fontSize: 11, fontWeight: "700", color: progressColor }}>
+            {progressPercent}%
+          </Text>
         </View>
+        <View
+          style={{
+            height: 5,
+            backgroundColor: colors.border,
+            borderRadius: 3,
+            overflow: "hidden",
+          }}
+        >
+          <View
+            style={{
+              height: "100%",
+              width: `${progressPercent}%`,
+              backgroundColor: progressColor,
+              borderRadius: 3,
+            }}
+          />
+        </View>
+        {stats.workedHours > 0 && (
+          <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
+            {stats.workedHours}ч зафиксировано
+          </Text>
+        )}
       </View>
 
       {/* Кнопка открытия месячного вида */}
-      <View className="mt-4 pt-3 border-t" style={{ borderColor: colors.border }}>
-        <Text className="text-xs text-primary font-semibold text-center">
-          Открыть месячный вид →
-        </Text>
-      </View>
+      <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "600", textAlign: "center" }}>
+        Открыть месячный вид →
+      </Text>
     </TouchableOpacity>
   );
 }

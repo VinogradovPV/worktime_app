@@ -306,8 +306,7 @@ export default function CalendarScreen() {
   };
 
   return (
-    <ScreenContainer className="p-0 flex-1 pt-2">
-      <View className="px-2">
+    <ScreenContainer className="p-0 flex-1">
       <CalendarHeader
         mode={calendarMode}
         onModeChange={setCalendarMode}
@@ -318,7 +317,7 @@ export default function CalendarScreen() {
       />
 
       {/* Содержимое календаря */}
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
         {calendarMode === "month" && (
           <View className="px-2">
             {/* День недели с номерами недель */}
@@ -516,7 +515,7 @@ export default function CalendarScreen() {
             <Text className="text-xs text-foreground ml-3">Отпуск</Text>
           </View>
 
-          <View className="flex-row items-center">
+          <View className="flex-row items-center mb-3">
             <View
               className="w-5 h-5 rounded"
               style={{
@@ -526,6 +525,19 @@ export default function CalendarScreen() {
               }}
             />
             <Text className="text-xs text-foreground ml-3">Больничный лист</Text>
+          </View>
+
+          <View className="flex-row items-center">
+            <View
+              className="w-5 h-5 rounded"
+              style={{
+                backgroundColor: colors.warning + "30",
+                borderWidth: 2,
+                borderColor: colors.warning,
+                borderStyle: "dashed",
+              }}
+            />
+            <Text className="text-xs text-foreground ml-3">Требует проверки (нет данных)</Text>
           </View>
         </View>
       </ScrollView>
@@ -559,7 +571,6 @@ export default function CalendarScreen() {
           setSelectedDayForDetail(null);
         }}
       />
-      </View>
     </ScreenContainer>
   );
 }
