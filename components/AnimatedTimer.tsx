@@ -66,12 +66,17 @@ export function AnimatedTimer({ time, isRunning, size = 200 }: AnimatedTimerProp
       <Text
         numberOfLines={1}
         adjustsFontSizeToFit
-        minimumFontScale={0.6}
+        minimumFontScale={0.4}
         style={{
-          fontSize: 48,
+          // Базовый размер: для времени вида "HH:MM:SS" (8 символов)
+          // adjustsFontSizeToFit автоматически уменьшит шрифт до minimumFontScale
+          fontSize: size * 0.18,
           fontWeight: 'bold',
           color: 'white',
-          paddingHorizontal: 12,
+          paddingHorizontal: size * 0.05,
+          width: size * 0.88,
+          textAlign: 'center',
+          letterSpacing: -0.5,
         }}
       >
         {time}

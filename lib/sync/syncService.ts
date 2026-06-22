@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { trpc } from "@/lib/trpc";
 import { WorkDay } from "@/shared/types/workday";
-import { getTodayWorkDay, saveWorkDay } from "@/lib/storage/workdayService";
+import { getAllWorkDays, saveWorkDay } from "@/lib/storage/workdayService";
 
 export interface SyncStatus {
   isSyncing: boolean;
@@ -80,8 +80,7 @@ class SyncService {
 
     try {
       // Get all local work days
-      const allWorkDays: WorkDay[] = [];
-      // TODO: Implement getAllWorkDays or fetch from storage
+      const allWorkDays: WorkDay[] = await getAllWorkDays();
       this.updateStatus({ syncProgress: 10 });
 
       // Get pending changes (modified since last sync)
@@ -179,8 +178,7 @@ class SyncService {
    */
   private async updatePendingChangesCount() {
     try {
-      const allWorkDays: WorkDay[] = [];
-      // TODO: Implement getAllWorkDays or fetch from storage
+      const allWorkDays: WorkDay[] = await getAllWorkDays();
       const lastSyncTime = this.syncStatus.lastSyncTime || new Date(0);
       const pendingCount = allWorkDays.filter(
         (day: WorkDay) => new Date(day.updatedAt) > lastSyncTime

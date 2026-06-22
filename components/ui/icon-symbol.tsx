@@ -29,6 +29,8 @@ const MAPPING = {
   "stop.fill": "stop",
   "plus.circle.fill": "add-circle",
   "xmark.circle.fill": "cancel",
+  "person.fill": "person",
+  "person.crop.circle": "account-circle",
 } as IconMapping;
 
 /**

@@ -122,16 +122,57 @@ export async function isDateInVacation(date: string): Promise<boolean> {
   }
 }
 
+/**
+ * Встроенный производственный календарь РФ 2026.
+ * Источник: Постановление Правительства РФ о переносе выходных дней.
+ * Включает официальные праздники и перенесённые рабочие дни.
+ */
+const BUILTIN_CALENDAR_2026: ProductionCalendar = {
+  id: "builtin_2026",
+  year: 2026,
+  uploadedAt: "2026-01-01T00:00:00.000Z",
+  holidays: [
+    // Январь: Новый год и Рождество
+    { date: "2026-01-01", name: "Новый год" },
+    { date: "2026-01-02", name: "Новогодние каникулы" },
+    { date: "2026-01-05", name: "Новогодние каникулы" },
+    { date: "2026-01-06", name: "Новогодние каникулы" },
+    { date: "2026-01-07", name: "Рождество Христово" },
+    { date: "2026-01-08", name: "Новогодние каникулы" },
+    { date: "2026-01-09", name: "Новогодние каникулы" },
+    // Февраль: День защитника Отечества
+    { date: "2026-02-23", name: "День защитника Отечества" },
+    // Март: Международный женский день
+    { date: "2026-03-09", name: "Международный женский день (перенос с 8 марта)" },
+    // Май: Праздники
+    { date: "2026-05-01", name: "Праздник Весны и Труда" },
+    { date: "2026-05-04", name: "Праздник Весны и Труда (перенос)" },
+    { date: "2026-05-11", name: "День Победы (перенос с 9 мая)" },
+    // Июнь: День России
+    { date: "2026-06-12", name: "День России" },
+    // Ноябрь: День народного единства
+    { date: "2026-11-04", name: "День народного единства" },
+  ],
+};
+
 // Получить производственный календарь
 export async function getProductionCalendar(year: number): Promise<ProductionCalendar | null> {
   try {
     const calendars = await AsyncStorage.getItem(PRODUCTION_CALENDAR_KEY);
-    if (!calendars) return null;
+    if (calendars) {
+      const parsed: ProductionCalendar[] = JSON.parse(calendars);
+      const userCalendar = parsed.find((c) => c.year === year);
+      if (userCalendar) return userCalendar;
+    }
 
-    const parsed: ProductionCalendar[] = JSON.parse(calendars);
-    return parsed.find((c) => c.year === year) || null;
+    // Возвращаем встроенный календарь, если пользовательский не загружен
+    if (year === 2026) return BUILTIN_CALENDAR_2026;
+
+    return null;
   } catch (error) {
     console.error("Ошибка при получении производственного календаря:", error);
+    // В случае ошибки возвращаем встроенный для 2026
+    if (year === 2026) return BUILTIN_CALENDAR_2026;
     return null;
   }
 }

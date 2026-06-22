@@ -9,6 +9,8 @@ import { Platform } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
+import * as Font from "expo-font";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import {
   SafeAreaFrameContext,
   SafeAreaInsetsContext,
@@ -40,6 +42,9 @@ export default function RootLayout() {
 
   const [insets, setInsets] = useState<EdgeInsets>(initialInsets);
   const [frame, setFrame] = useState<Rect>(initialFrame);
+
+  // Предзагрузка шрифта MaterialIcons — не блокируем рендер (иконки появятся после загрузки)
+  Font.useFonts(MaterialIcons.font);
 
   // Initialize Manus runtime for cookie injection from parent container
   useEffect(() => {

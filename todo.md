@@ -761,3 +761,21 @@
 - [x] Протестировать синхронизацию данных
 - [x] Проверить производительность
 - [ ] Сохранить финальный чекпоинт
+
+## Исправления по результатам аудита
+
+### Критические
+- [x] Добавить маппинг person.fill -> person в icon-symbol.tsx
+- [x] Скрыть analytics.tsx и profile.tsx из таб-бара (href: null)
+- [x] Интегрировать WorkDayEventEditor в DayDetailModal
+- [x] Добавить встроенный производственный календарь РФ 2026 в notificationSettings.ts
+
+### Некритические
+- [x] Удалить неиспользуемые сервисы: workdayStatsServiceOptimized, reportStatsServiceOptimized, calendarStatsService, statsCacheService, workSessionStorage
+- [x] Реализовать выбор фото в AvatarUpload через expo-image-picker
+- [x] Реализовать getAllWorkDays() в workdayService.ts и подключить к syncService
+- [x] Исправить мутацию Date в getPeriodStart (week)
+
+### Информационные
+- [x] Удалить неиспользуемые компоненты: AnalyticsCalendar, VirtualizedDetailsList, external-link, hello-wave, parallax-scroll-view
+- [x] Проверить и исправить обрезание текста в AnimatedTimer при >10ч

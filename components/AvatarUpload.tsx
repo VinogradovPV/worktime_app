@@ -7,7 +7,9 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { ScreenContainer } from "./screen-container";
 import { useColors } from "@/hooks/use-colors";
@@ -24,39 +26,78 @@ export function AvatarUpload({ currentAvatar, onAvatarSelected }: AvatarUploadPr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const pickImage = async () => {
+  const requestPermission = async (type: "library" | "camera"): Promise<boolean> => {
+    if (Platform.OS === "web") return true;
+    if (type === "library") {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      return status === "granted";
+    } else {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      return status === "granted";
+    }
+  };
+
+  const pickFromGallery = async () => {
     try {
       setError(null);
-      // For now, we'll show a placeholder message
-      // In a real app, you would integrate with native image picker
-      Alert.alert(
-        "Загрузить фото",
-        "Выберите источник изображения",
-        [
-          {
-            text: "Отмена",
-            onPress: () => {},
-            style: "cancel",
-          },
-          {
-            text: "Из галереи",
-            onPress: () => {
-              // This would be implemented with native module
-              setError("Функция загрузки изображения требует нативной интеграции");
-            },
-          },
-          {
-            text: "Сделать фото",
-            onPress: () => {
-              setError("Функция камеры требует нативной интеграции");
-            },
-          },
-        ]
-      );
+      const granted = await requestPermission("library");
+      if (!granted) {
+        Alert.alert("Нет доступа", "Разрешите доступ к галерее в настройках устройства.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets.length > 0) {
+        setSelectedImage(result.assets[0].uri);
+        setPreviewModalVisible(true);
+      }
     } catch (err) {
-      setError("Ошибка при выборе изображения");
-      console.error("Image picker error:", err);
+      setError("Ошибка при выборе изображения из галереи");
+      console.error("Gallery picker error:", err);
     }
+  };
+
+  const pickFromCamera = async () => {
+    try {
+      setError(null);
+      const granted = await requestPermission("camera");
+      if (!granted) {
+        Alert.alert("Нет доступа", "Разрешите доступ к камере в настройках устройства.");
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets.length > 0) {
+        setSelectedImage(result.assets[0].uri);
+        setPreviewModalVisible(true);
+      }
+    } catch (err) {
+      setError("Ошибка при съёмке фото");
+      console.error("Camera error:", err);
+    }
+  };
+
+  const pickImage = () => {
+    Alert.alert(
+      "Загрузить фото",
+      "Выберите источник изображения",
+      [
+        { text: "Отмена", style: "cancel" },
+        { text: "Из галереи", onPress: pickFromGallery },
+        { text: "Сделать фото", onPress: pickFromCamera },
+      ]
+    );
   };
 
   const convertToBase64 = async (uri: string): Promise<string> => {

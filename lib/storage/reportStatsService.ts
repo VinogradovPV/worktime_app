@@ -291,10 +291,10 @@ export function getPeriodStart(date: Date, period: "day" | "week" | "month" | "q
   if (period === "day") {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
   } else if (period === "week") {
-    // Начало недели (понедельник)
+    // Начало недели (понедельник) — без мутации d
     const dayOfWeek = d.getDay();
     const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-    return new Date(d.setDate(diff));
+    return new Date(d.getFullYear(), d.getMonth(), diff);
   } else if (period === "month") {
     return new Date(d.getFullYear(), d.getMonth(), 1);
   } else if (period === "quarter") {
@@ -316,10 +316,10 @@ export function getPeriodEnd(date: Date, period: "day" | "week" | "month" | "qua
   if (period === "day") {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
   } else if (period === "week") {
-    // Конец недели (воскресенье)
+    // Конец недели (воскресенье) — без мутации d
     const dayOfWeek = d.getDay();
     const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? 0 : 7);
-    return new Date(d.setDate(diff));
+    return new Date(d.getFullYear(), d.getMonth(), diff, 23, 59, 59);
   } else if (period === "month") {
     return new Date(d.getFullYear(), d.getMonth() + 1, 0);
   } else if (period === "quarter") {

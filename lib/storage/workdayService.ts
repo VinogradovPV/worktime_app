@@ -226,6 +226,32 @@ export function hasActiveTemporaryExit(workDay: WorkDay): boolean {
 }
 
 /**
+ * Получает все сохранённые рабочие дни
+ */
+export async function getAllWorkDays(): Promise<WorkDay[]> {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const workdayKeys = keys.filter((key) => key.startsWith(WORKDAY_KEY_PREFIX));
+    if (workdayKeys.length === 0) return [];
+    const pairs = await AsyncStorage.multiGet(workdayKeys);
+    const workDays: WorkDay[] = [];
+    for (const [, value] of pairs) {
+      if (value) {
+        try {
+          workDays.push(JSON.parse(value) as WorkDay);
+        } catch {
+          // Пропускаем повреждённые записи
+        }
+      }
+    }
+    return workDays.sort((a, b) => a.date.localeCompare(b.date));
+  } catch (error) {
+    console.error('Error getting all workdays:', error);
+    return [];
+  }
+}
+
+/**
  * Удаляет все рабочие дни (для тестирования)
  */
 export async function clearAllWorkDays(): Promise<void> {
