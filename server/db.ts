@@ -1,92 +1,208 @@
-import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
-import { ENV } from "./_core/env";
+import { eq, and, gte, lte } from "drizzle-orm";
+import { getDb } from "./_core/db";
+import { workDays, syncLogs, users, InsertWorkDay, InsertSyncLog, InsertUser } from "../drizzle/schema";
 
-let _db: ReturnType<typeof drizzle> | null = null;
-
-// Lazily create the drizzle instance so local tooling can run without a DB.
-export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
-    try {
-      _db = drizzle(process.env.DATABASE_URL);
-    } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
-      _db = null;
-    }
-  }
-  return _db;
-}
-
-export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) {
-    throw new Error("User openId is required for upsert");
-  }
-
+/**
+ * Get all work days for a user within a date range
+ */
+export async function getUserWorkDays(
+  userId: number,
+  startDate: string,
+  endDate: string
+) {
   const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot upsert user: database not available");
-    return;
-  }
+  if (!db) return [];
 
-  try {
-    const values: InsertUser = {
-      openId: user.openId,
-    };
-    const updateSet: Record<string, unknown> = {};
+  return db
+    .select()
+    .from(workDays)
+    .where(
+      and(
+        eq(workDays.userId, userId),
+        gte(workDays.date, startDate),
+        lte(workDays.date, endDate)
+      )
+    );
+}
 
-    const textFields = ["name", "email", "loginMethod"] as const;
-    type TextField = (typeof textFields)[number];
+/**
+ * Get a specific work day for a user
+ */
+export async function getUserWorkDay(userId: number, date: string) {
+  const db = await getDb();
+  if (!db) return null;
 
-    const assignNullable = (field: TextField) => {
-      const value = user[field];
-      if (value === undefined) return;
-      const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
-    };
+  const result = await db
+    .select()
+    .from(workDays)
+    .where(and(eq(workDays.userId, userId), eq(workDays.date, date)))
+    .limit(1);
 
-    textFields.forEach(assignNullable);
+  return result[0] || null;
+}
 
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = "admin";
-      updateSet.role = "admin";
-    }
+/**
+ * Create or update a work day
+ */
+export async function upsertWorkDay(data: InsertWorkDay) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
 
-    if (!values.lastSignedIn) {
-      values.lastSignedIn = new Date();
-    }
+  const existing = await getUserWorkDay(data.userId, data.date);
 
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
-    }
+  if (existing) {
+    // Update existing
+    await db
+      .update(workDays)
+      .set({
+        ...data,
+        version: (existing.version || 1) + 1,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(eq(workDays.userId, data.userId), eq(workDays.date, data.date))
+      );
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
-    });
-  } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
-    throw error;
+    return existing.id;
+  } else {
+    // Insert new
+    const result = await db.insert(workDays).values(data);
+    return (result as any).insertId || 0;
   }
 }
 
+/**
+ * Batch upsert work days
+ */
+export async function batchUpsertWorkDays(days: InsertWorkDay[]) {
+  const results: number[] = [];
+  for (const day of days) {
+    const id = await upsertWorkDay(day);
+    results.push(id);
+  }
+  return results;
+}
+
+/**
+ * Delete a work day
+ */
+export async function deleteWorkDay(userId: number, date: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .delete(workDays)
+    .where(and(eq(workDays.userId, userId), eq(workDays.date, date)));
+}
+
+/**
+ * Get work days that need to be synced (modified after last sync)
+ */
+export async function getUnsyncedWorkDays(userId: number, lastSyncTime: Date) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db
+    .select()
+    .from(workDays)
+    .where(
+      and(
+        eq(workDays.userId, userId),
+        gte(workDays.updatedAt, lastSyncTime)
+      )
+    );
+}
+
+/**
+ * Log a sync event
+ */
+export async function logSyncEvent(data: InsertSyncLog) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(syncLogs).values(data);
+  return (result as any).insertId || 0;
+}
+
+/**
+ * Get sync history for a user
+ */
+export async function getUserSyncHistory(userId: number, limit: number = 100) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db
+    .select()
+    .from(syncLogs)
+    .where(eq(syncLogs.userId, userId))
+    .orderBy((t: any) => [t.createdAt])
+    .limit(limit);
+}
+
+/**
+ * Get user by openId
+ */
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
-    return undefined;
-  }
+  if (!db) return null;
 
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, openId))
+    .limit(1);
 
-  return result.length > 0 ? result[0] : undefined;
+  return result[0] || null;
 }
 
-// TODO: add feature queries here as your schema grows.
+/**
+ * Upsert user (for auth sync)
+ */
+export async function upsertUser(data: Partial<InsertUser>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  if (!data.openId) throw new Error("openId is required");
+
+  const existing = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, data.openId))
+    .limit(1);
+
+  if (existing.length > 0) {
+    await db
+      .update(users)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.openId, data.openId));
+    return existing[0].id;
+  } else {
+    const result = await db.insert(users).values(data as InsertUser);
+    return (result as any).insertId || 0;
+  }
+}
+
+/**
+ * Get last successful sync time for a user
+ */
+export async function getLastSyncTime(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db
+    .select()
+    .from(syncLogs)
+    .where(
+      and(
+        eq(syncLogs.userId, userId),
+        eq(syncLogs.status, "success")
+      )
+    )
+    .orderBy((t: any) => [t.createdAt])
+    .limit(1);
+
+  return result[0]?.createdAt || null;
+}

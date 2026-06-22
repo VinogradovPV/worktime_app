@@ -18,6 +18,8 @@ import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 
 import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
+import { syncService } from "@/lib/sync/syncService";
+import { autoSyncService } from "@/lib/sync/autoSyncService";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -36,6 +38,26 @@ export default function RootLayout() {
   // Initialize Manus runtime for cookie injection from parent container
   useEffect(() => {
     initManusRuntime();
+  }, []);
+
+  // Initialize sync services
+  useEffect(() => {
+    const initSync = async () => {
+      await syncService.init();
+      await autoSyncService.init({
+        enableAutoSync: true,
+        syncOnWifiOnly: false,
+        syncInterval: 5 * 60 * 1000, // 5 minutes
+      });
+    };
+
+    initSync().catch((error) => {
+      console.error("Failed to initialize sync services:", error);
+    });
+
+    return () => {
+      autoSyncService.stop();
+    };
   }, []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
@@ -65,6 +87,11 @@ export default function RootLayout() {
   );
   const [trpcClient] = useState(() => createTRPCClient());
 
+  // Mark work day as modified when it changes
+  const markWorkDayModified = useCallback((date: string) => {
+    syncService.markWorkDayModified(date);
+  }, []);
+
   // Ensure minimum 8px padding for top and bottom on mobile
   const providerInitialMetrics = useMemo(() => {
     const metrics = initialWindowMetrics ?? { insets: initialInsets, frame: initialFrame };
@@ -82,7 +109,9 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
+          {/* Sync context would go here if needed */}
           {/* Default to hiding native headers so raw route segments don't appear (e.g. "(tabs)", "products/[id]"). */}
+          {/* Sync services initialized above */}
           {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}
           {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
           <Stack screenOptions={{ headerShown: false }}>

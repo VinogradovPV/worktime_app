@@ -25,4 +25,48 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+/**
+ * WorkDays table for storing work day records synced from mobile app
+ */
+export const workDays = mysqlTable("workDays", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD format
+  dayType: mysqlEnum("dayType", [
+    "workday",
+    "weekend",
+    "holiday",
+    "vacation",
+    "shortened_workday",
+  ])
+    .default("workday")
+    .notNull(),
+  totalWorkedMs: int("totalWorkedMs").default(0).notNull(), // Total worked time in milliseconds
+  totalBreakMs: int("totalBreakMs").default(0).notNull(), // Total break time in milliseconds
+  totalTemporaryExitMs: int("totalTemporaryExitMs").default(0).notNull(), // Total temporary exit time
+  eventsJson: text("eventsJson").notNull(), // JSON array of WorkDayEvent objects
+  syncedAt: timestamp("syncedAt").defaultNow().notNull(), // When this was last synced
+  version: int("version").default(1).notNull(), // Version for conflict resolution
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type WorkDay = typeof workDays.$inferSelect;
+export type InsertWorkDay = typeof workDays.$inferInsert;
+
+/**
+ * SyncLog table for tracking synchronization history
+ */
+export const syncLogs = mysqlTable("syncLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  action: mysqlEnum("action", ["upload", "download", "conflict", "error"]).notNull(),
+  workDayId: int("workDayId"),
+  date: varchar("date", { length: 10 }),
+  status: mysqlEnum("status", ["success", "failed", "pending"]).default("pending").notNull(),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SyncLog = typeof syncLogs.$inferSelect;
+export type InsertSyncLog = typeof syncLogs.$inferInsert;
