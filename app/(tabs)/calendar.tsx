@@ -6,6 +6,12 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { getProductionCalendar, getVacationPeriods, addVacationPeriod, removeVacationPeriod } from "@/lib/storage/notificationSettings";
 import { AddVacationModal } from "@/components/AddVacationModal";
 import { EditVacationModal } from "@/components/EditVacationModal";
+import { DayDetailModal } from "@/components/DayDetailModal";
+import { WeekCalendarView } from "@/components/WeekCalendarView";
+import { YearCalendarView } from "@/components/YearCalendarView";
+import { QuarterCalendarView } from "@/components/QuarterCalendarView";
+
+type CalendarMode = "month" | "week" | "quarter" | "year";
 
 interface DayInfo {
   date: string; // YYYY-MM-DD
@@ -16,6 +22,7 @@ interface DayInfo {
 
 export default function CalendarScreen() {
   const colors = useColors();
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>("month");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [holidays, setHolidays] = useState<string[]>([]);
   const [vacationPeriods, setVacationPeriods] = useState<any[]>([]);
@@ -23,6 +30,10 @@ export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<any>(null);
+  const [dayDetailVisible, setDayDetailVisible] = useState(false);
+  const [selectedDayForDetail, setSelectedDayForDetail] = useState<Date | null>(null);
+  const [selectedDayType, setSelectedDayType] = useState<"weekend" | "holiday" | "vacation" | "workday">("workday");
+  const [selectedDayVacationType, setSelectedDayVacationType] = useState<"vacation" | "sick_leave" | "unpaid_leave" | undefined>(undefined);
 
   useEffect(() => {
     loadCalendarData();
@@ -105,6 +116,31 @@ export default function CalendarScreen() {
     };
   };
 
+  const getDayTypeFromDate = (date: Date): DayInfo => {
+    const dateStr = formatDate(date.getFullYear(), date.getMonth(), date.getDate());
+    let type: "weekend" | "holiday" | "vacation" | "workday" = "workday";
+    let vacationType: "vacation" | "sick_leave" | "unpaid_leave" | undefined;
+
+    if (isWeekend(date)) {
+      type = "weekend";
+    } else if (isHoliday(dateStr)) {
+      type = "holiday";
+    } else {
+      const vType = getVacationType(dateStr);
+      if (vType) {
+        type = "vacation";
+        vacationType = vType as any;
+      }
+    }
+
+    return {
+      date: dateStr,
+      dayOfMonth: date.getDate(),
+      type,
+      vacationType,
+    };
+  };
+
   const getTypeColor = (dayInfo: DayInfo) => {
     switch (dayInfo.type) {
       case "weekend":
@@ -139,10 +175,57 @@ export default function CalendarScreen() {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
   };
 
-  const handleDayPress = (day: number) => {
-    const dateStr = formatDate(currentDate.getFullYear(), currentDate.getMonth(), day);
-    setSelectedDate(dateStr);
-    setModalVisible(true);
+  const previousWeek = () => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(currentDate.getDate() - 7);
+    setCurrentDate(newDate);
+  };
+
+  const nextWeek = () => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(currentDate.getDate() + 7);
+    setCurrentDate(newDate);
+  };
+
+  const previousQuarter = () => {
+    const newDate = new Date(currentDate);
+    newDate.setMonth(currentDate.getMonth() - 3);
+    setCurrentDate(newDate);
+  };
+
+  const nextQuarter = () => {
+    const newDate = new Date(currentDate);
+    newDate.setMonth(currentDate.getMonth() + 3);
+    setCurrentDate(newDate);
+  };
+
+  const previousYear = () => {
+    setCurrentDate(new Date(currentDate.getFullYear() - 1, currentDate.getMonth()));
+  };
+
+  const nextYear = () => {
+    setCurrentDate(new Date(currentDate.getFullYear() + 1, currentDate.getMonth()));
+  };
+
+  const getCurrentQuarter = () => {
+    return Math.floor(currentDate.getMonth() / 3) + 1;
+  };
+
+  const handleDayPress = (day: number | Date) => {
+    let date: Date;
+
+    if (typeof day === "number") {
+      date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+    } else {
+      date = day;
+    }
+
+    // Показываем детали дня
+    const dayInfo = getDayTypeFromDate(date);
+    setSelectedDayForDetail(date);
+    setSelectedDayType(dayInfo.type);
+    setSelectedDayVacationType(dayInfo.vacationType);
+    setDayDetailVisible(true);
   };
 
   const handleAddVacation = async (startDate: string, endDate: string, type: "vacation" | "sick_leave" | "unpaid_leave") => {
@@ -203,137 +286,235 @@ export default function CalendarScreen() {
     }
   };
 
+  const getModeButtonStyle = (mode: CalendarMode) => {
+    const isActive = calendarMode === mode;
+    return {
+      backgroundColor: isActive ? colors.primary : colors.surface,
+      borderColor: isActive ? colors.primary : colors.border,
+    };
+  };
+
+  const getModeButtonTextStyle = (mode: CalendarMode) => {
+    const isActive = calendarMode === mode;
+    return {
+      color: isActive ? colors.background : colors.foreground,
+    };
+  };
+
   return (
-    <ScreenContainer className="p-4">
-      <View className="flex-row justify-between items-center mb-6">
-        <TouchableOpacity onPress={previousMonth}>
-          <Text className="text-2xl text-primary font-bold">←</Text>
+    <ScreenContainer className="p-0">
+      {/* Переключатель режимов */}
+      <View className="flex-row px-4 pt-4 pb-2 gap-2 justify-center">
+        <TouchableOpacity
+          onPress={() => setCalendarMode("week")}
+          className="px-4 py-2 rounded-lg border"
+          style={getModeButtonStyle("week")}
+        >
+          <Text className="text-xs font-semibold" style={getModeButtonTextStyle("week")}>
+            Неделя
+          </Text>
         </TouchableOpacity>
-        <Text className="text-2xl font-bold text-foreground capitalize">{monthName}</Text>
-        <TouchableOpacity onPress={nextMonth}>
-          <Text className="text-2xl text-primary font-bold">→</Text>
+        <TouchableOpacity
+          onPress={() => setCalendarMode("month")}
+          className="px-4 py-2 rounded-lg border"
+          style={getModeButtonStyle("month")}
+        >
+          <Text className="text-xs font-semibold" style={getModeButtonTextStyle("month")}>
+            Месяц
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setCalendarMode("quarter")}
+          className="px-4 py-2 rounded-lg border"
+          style={getModeButtonStyle("quarter")}
+        >
+          <Text className="text-xs font-semibold" style={getModeButtonTextStyle("quarter")}>
+            Квартал
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setCalendarMode("year")}
+          className="px-4 py-2 rounded-lg border"
+          style={getModeButtonStyle("year")}
+        >
+          <Text className="text-xs font-semibold" style={getModeButtonTextStyle("year")}>
+            Год
+          </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* День недели */}
-        <View className="flex-row mb-2">
-          {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((day, index) => (
-            <View key={index} className="flex-1 items-center py-2">
-              <Text className="text-xs font-semibold text-muted">{day}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Календарь */}
-        <View className="flex-row flex-wrap">
-          {/* Пустые дни в начале месяца */}
-          {emptyDays.map((_, index) => (
-            <View key={`empty-${index}`} className="w-1/7 aspect-square" />
-          ))}
-
-          {/* Дни месяца */}
-          {days.map((day) => {
-            const dayInfo = getDayType(day);
-            const colors_info = getTypeColor(dayInfo);
-
-            return (
-              <TouchableOpacity
-                key={day}
-                className="w-1/7 aspect-square items-center justify-center rounded-lg mb-1 mx-0.5"
-                style={{
-                  backgroundColor: colors_info.bg,
-                  borderWidth: 1.5,
-                  borderColor: colors_info.border,
-                }}
-                onPress={() => handleDayPress(day)}
-                onLongPress={() => handleDayLongPress(day)}
-              >
-                <View className="items-center justify-center">
-                  <Text className="text-sm font-semibold text-foreground">{day}</Text>
-                </View>
+      {/* Содержимое календаря */}
+      <View className="flex-1">
+        {calendarMode === "month" && (
+          <ScrollView showsVerticalScrollIndicator={false} className="px-4">
+            {/* Навигация по месяцам */}
+            <View className="flex-row justify-between items-center mb-6 pt-4">
+              <TouchableOpacity onPress={previousMonth}>
+                <Text className="text-2xl text-primary font-bold">←</Text>
               </TouchableOpacity>
-            );
-          })}
-        </View>
+              <Text className="text-2xl font-bold text-foreground capitalize">{monthName}</Text>
+              <TouchableOpacity onPress={nextMonth}>
+                <Text className="text-2xl text-primary font-bold">→</Text>
+              </TouchableOpacity>
+            </View>
 
-        {/* Легенда */}
-        <View className="mt-8 p-4 rounded-lg border border-border" style={{ backgroundColor: colors.surface }}>
-          <Text className="text-sm font-semibold text-foreground mb-4">Легенда</Text>
+            {/* День недели */}
+            <View className="flex-row mb-2">
+              {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((day, index) => (
+                <View key={index} className="flex-1 items-center py-2">
+                  <Text className="text-xs font-semibold text-muted">{day}</Text>
+                </View>
+              ))}
+            </View>
 
-          {/* Рабочий день */}
-          <View className="flex-row items-center mb-3">
-            <View
-              className="w-5 h-5 rounded"
-              style={{
-                backgroundColor: colors.success + "20",
-                borderWidth: 1.5,
-                borderColor: colors.success,
-              }}
-            />
-            <Text className="text-xs text-foreground ml-3">Рабочий день</Text>
-          </View>
+            {/* Календарь */}
+            <View className="flex-row flex-wrap">
+              {/* Пустые дни в начале месяца */}
+              {emptyDays.map((_, index) => (
+                <View key={`empty-${index}`} className="w-1/7 aspect-square" />
+              ))}
 
-          {/* Выходной */}
-          <View className="flex-row items-center mb-3">
-            <View
-              className="w-5 h-5 rounded"
-              style={{
-                backgroundColor: colors.muted + "20",
-                borderWidth: 1.5,
-                borderColor: colors.muted,
-              }}
-            />
-            <Text className="text-xs text-foreground ml-3">Выходной (Сб, Вс)</Text>
-          </View>
+              {/* Дни месяца */}
+              {days.map((day) => {
+                const dayInfo = getDayType(day);
+                const colors_info = getTypeColor(dayInfo);
 
-          {/* Праздничный день */}
-          <View className="flex-row items-center mb-3">
-            <View
-              className="w-5 h-5 rounded"
-              style={{
-                backgroundColor: colors.error + "20",
-                borderWidth: 1.5,
-                borderColor: colors.error,
-              }}
-            />
-            <Text className="text-xs text-foreground ml-3">Праздничный день</Text>
-          </View>
+                return (
+                  <TouchableOpacity
+                    key={day}
+                    className="w-1/7 aspect-square items-center justify-center rounded-lg mb-1 mx-0.5"
+                    style={{
+                      backgroundColor: colors_info.bg,
+                      borderWidth: 1.5,
+                      borderColor: colors_info.border,
+                    }}
+                    onPress={() => handleDayPress(day)}
+                    onLongPress={() => handleDayLongPress(day)}
+                  >
+                    <View className="items-center justify-center">
+                      <Text className="text-sm font-semibold text-foreground">{day}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
-          {/* Отпуск */}
-          <View className="flex-row items-center mb-3">
-            <View
-              className="w-5 h-5 rounded"
-              style={{
-                backgroundColor: colors.primary + "20",
-                borderWidth: 1.5,
-                borderColor: colors.primary,
-              }}
-            />
-            <Text className="text-xs text-foreground ml-3">Отпуск</Text>
-          </View>
+            {/* Легенда */}
+            <View className="mt-8 p-4 rounded-lg border border-border mb-6" style={{ backgroundColor: colors.surface }}>
+              <Text className="text-sm font-semibold text-foreground mb-4">Легенда</Text>
 
-          {/* Больничный */}
-          <View className="flex-row items-center">
-            <View
-              className="w-5 h-5 rounded"
-              style={{
-                backgroundColor: colors.warning + "20",
-                borderWidth: 1.5,
-                borderColor: colors.warning,
-              }}
-            />
-            <Text className="text-xs text-foreground ml-3">Больничный лист</Text>
-          </View>
-        </View>
+              {/* Рабочий день */}
+              <View className="flex-row items-center mb-3">
+                <View
+                  className="w-5 h-5 rounded"
+                  style={{
+                    backgroundColor: colors.success + "20",
+                    borderWidth: 1.5,
+                    borderColor: colors.success,
+                  }}
+                />
+                <Text className="text-xs text-foreground ml-3">Рабочий день</Text>
+              </View>
 
-        {/* Информация */}
-        <View className="mt-6 p-4 rounded-lg" style={{ backgroundColor: colors.surface }}>
-          <Text className="text-xs text-muted">
-            Календарь показывает выходные дни (суббота и воскресенье), праздничные дни из загруженного производственного календаря и ваши периоды отпусков.
-          </Text>
-        </View>
-      </ScrollView>
+              {/* Выходной */}
+              <View className="flex-row items-center mb-3">
+                <View
+                  className="w-5 h-5 rounded"
+                  style={{
+                    backgroundColor: colors.muted + "20",
+                    borderWidth: 1.5,
+                    borderColor: colors.muted,
+                  }}
+                />
+                <Text className="text-xs text-foreground ml-3">Выходной (Сб, Вс)</Text>
+              </View>
+
+              {/* Праздничный день */}
+              <View className="flex-row items-center mb-3">
+                <View
+                  className="w-5 h-5 rounded"
+                  style={{
+                    backgroundColor: colors.error + "20",
+                    borderWidth: 1.5,
+                    borderColor: colors.error,
+                  }}
+                />
+                <Text className="text-xs text-foreground ml-3">Праздничный день</Text>
+              </View>
+
+              {/* Отпуск */}
+              <View className="flex-row items-center mb-3">
+                <View
+                  className="w-5 h-5 rounded"
+                  style={{
+                    backgroundColor: colors.primary + "20",
+                    borderWidth: 1.5,
+                    borderColor: colors.primary,
+                  }}
+                />
+                <Text className="text-xs text-foreground ml-3">Отпуск</Text>
+              </View>
+
+              {/* Больничный */}
+              <View className="flex-row items-center">
+                <View
+                  className="w-5 h-5 rounded"
+                  style={{
+                    backgroundColor: colors.warning + "20",
+                    borderWidth: 1.5,
+                    borderColor: colors.warning,
+                  }}
+                />
+                <Text className="text-xs text-foreground ml-3">Больничный лист</Text>
+              </View>
+            </View>
+
+            {/* Информация */}
+            <View className="mt-6 p-4 rounded-lg mb-6" style={{ backgroundColor: colors.surface }}>
+              <Text className="text-xs text-muted">
+                Календарь показывает выходные дни (суббота и воскресенье), праздничные дни из загруженного производственного календаря и ваши периоды отпусков.
+              </Text>
+            </View>
+          </ScrollView>
+        )}
+
+        {calendarMode === "week" && (
+          <WeekCalendarView
+            currentDate={currentDate}
+            onPreviousWeek={previousWeek}
+            onNextWeek={nextWeek}
+            holidays={holidays}
+            vacationPeriods={vacationPeriods}
+            onDayPress={handleDayPress}
+          />
+        )}
+
+        {calendarMode === "quarter" && (
+          <QuarterCalendarView
+            currentYear={currentDate.getFullYear()}
+            currentQuarter={getCurrentQuarter()}
+            onPreviousQuarter={previousQuarter}
+            onNextQuarter={nextQuarter}
+            holidays={holidays}
+            vacationPeriods={vacationPeriods}
+            onDayPress={handleDayPress}
+          />
+        )}
+
+        {calendarMode === "year" && (
+          <YearCalendarView
+            currentYear={currentDate.getFullYear()}
+            onPreviousYear={previousYear}
+            onNextYear={nextYear}
+            holidays={holidays}
+            vacationPeriods={vacationPeriods}
+            onMonthPress={(month) => {
+              setCurrentDate(new Date(currentDate.getFullYear(), month - 1));
+              setCalendarMode("month");
+            }}
+          />
+        )}
+      </View>
 
       {/* Модальное окно для добавления отпуска */}
       <AddVacationModal
@@ -353,6 +534,18 @@ export default function CalendarScreen() {
         }}
         onUpdate={handleUpdateVacation}
         onDelete={handleDeleteVacation}
+      />
+
+      {/* Модальное окно с деталями дня */}
+      <DayDetailModal
+        visible={dayDetailVisible}
+        date={selectedDayForDetail}
+        dayType={selectedDayType}
+        vacationType={selectedDayVacationType}
+        onClose={() => {
+          setDayDetailVisible(false);
+          setSelectedDayForDetail(null);
+        }}
       />
     </ScreenContainer>
   );
