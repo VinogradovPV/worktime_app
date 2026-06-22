@@ -357,15 +357,25 @@ export default function CalendarScreen() {
                     const dayInfo = getDayType(day);
                     const colors_info = getTypeColor(dayInfo);
 
+                    const today = new Date();
+                    const isToday = day === today.getDate() && 
+                                   currentDate.getMonth() === today.getMonth() && 
+                                   currentDate.getFullYear() === today.getFullYear();
+
                     return (
                       <TouchableOpacity
                         key={day}
                         className="flex-1 aspect-square items-center justify-center rounded-lg mx-0.5 mb-0.5"
                         style={{
                           backgroundColor: colors_info.bg,
-                          borderWidth: 1.5,
-                          borderColor: colors_info.border,
+                          borderWidth: isToday ? 3 : 1.5,
+                          borderColor: isToday ? colors.primary : colors_info.border,
                           minHeight: 56,
+                          shadowColor: isToday ? colors.primary : 'transparent',
+                          shadowOffset: isToday ? { width: 0, height: 0 } : { width: 0, height: 0 },
+                          shadowOpacity: isToday ? 0.3 : 0,
+                          shadowRadius: isToday ? 4 : 0,
+                          elevation: isToday ? 4 : 0,
                         }}
                         onPress={() => handleDayPress(day)}
                         onLongPress={() => handleDayLongPress(day)}
