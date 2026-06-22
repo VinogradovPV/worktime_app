@@ -1,6 +1,5 @@
 import { View, Text, TouchableOpacity, ScrollView } from "react-native";
 import { useColors } from "@/hooks/use-colors";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type CalendarMode = "month" | "week" | "quarter" | "year";
 
@@ -22,7 +21,6 @@ export function CalendarHeader({
   onToday,
 }: CalendarHeaderProps) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
 
   const getPeriodLabel = (): string => {
     const year = currentDate.getFullYear();
@@ -98,7 +96,7 @@ export function CalendarHeader({
   };
 
   return (
-    <View style={{ paddingTop: insets.top }}>
+    <View>
       {/* Заголовок */}
       <View className="px-4 py-3">
         <Text className="text-lg font-bold text-foreground">Календарь</Text>

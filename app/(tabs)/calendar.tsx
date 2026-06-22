@@ -75,7 +75,9 @@ export default function CalendarScreen() {
   };
 
   const getFirstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+    // Конвертируем в Monday-first: Пн=0, Вт=1, ..., Сб=5, Вс=6
+    const day = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+    return day === 0 ? 6 : day - 1;
   };
 
   const formatDate = (year: number, month: number, day: number): string => {
