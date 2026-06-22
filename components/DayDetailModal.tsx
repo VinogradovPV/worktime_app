@@ -1,6 +1,6 @@
 import { Modal, View, Text, TouchableOpacity, ScrollView } from "react-native";
 import { useColors } from "@/hooks/use-colors";
-import { getWorkDay, saveWorkDay } from "@/lib/storage/workdayService";
+import { getWorkDay, saveWorkDay, rebuildWorkDayFromEvents } from "@/lib/storage/workdayService";
 import { calculateWorkDayStats, formatTime, formatTimeShort } from "@/lib/storage/workdayStatsService";
 import { useState, useEffect } from "react";
 import { WorkDay } from "@/shared/types/workday";
@@ -65,15 +65,17 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
 
   const handleSaveWorkDay = async (updatedWorkDay: WorkDay) => {
     try {
-      await saveWorkDay(updatedWorkDay);
-      setWorkDay(updatedWorkDay);
-      const stats = calculateWorkDayStats(updatedWorkDay);
+      // Пересчитываем производные поля из событий перед сохранением
+      const rebuilt = rebuildWorkDayFromEvents(updatedWorkDay);
+      await saveWorkDay(rebuilt);
+      setWorkDay(rebuilt);
+      const stats = calculateWorkDayStats(rebuilt);
       setDayStats({
         totalWorkTime: stats.totalWorkMs,
         breakTime: stats.totalBreakMs,
         temporaryExitTime: stats.totalTemporaryExitMs,
         work95Time: stats.work95Ms,
-        eventsCount: updatedWorkDay.events.length,
+        eventsCount: rebuilt.events.length,
       });
     } catch (error) {
       console.error("Ошибка при сохранении рабочего дня:", error);
@@ -263,8 +265,8 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
             </View>
           </ScrollView>
 
-          {/* Кнопка редактирования событий (только для рабочих дней) */}
-          {dayType === "workday" && workDay && (
+          {/* Кнопка редактирования событий (только для рабочих дней с данными или без данных) */}
+          {dayType === "workday" && (workDay || date) && (
             <View className="px-4 py-4 border-t" style={{ borderTopColor: colors.border }}>
               <TouchableOpacity
                 onPress={() => setEditorVisible(true)}
@@ -278,18 +280,37 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
         </View>
       </Modal>
 
-      {/* Редактор событий рабочего дня */}
-      {workDay && (
-        <WorkDayEventEditor
-          visible={editorVisible}
-          workDay={workDay}
-          onClose={() => setEditorVisible(false)}
-          onSave={async (updated) => {
-            await handleSaveWorkDay(updated);
-            setEditorVisible(false);
-          }}
-        />
-      )}
+      {/* Редактор событий рабочего дня — доступен для любого прошлого рабочего дня */}
+      {editorVisible && date && (() => {
+        const dateStr = formatDate(date.getFullYear(), date.getMonth(), date.getDate());
+        const editorWorkDay: WorkDay = workDay ?? {
+          id: `${Date.now()}-new`,
+          date: dateStr,
+          status: 'not_started',
+          workStartAt: null,
+          workEndAt: null,
+          breakIntervals: [],
+          temporaryExitIntervals: [],
+          events: [],
+          totalWorkMs: 0,
+          totalBreakMs: 0,
+          totalTemporaryExitMs: 0,
+          work95Ms: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        return (
+          <WorkDayEventEditor
+            visible={editorVisible}
+            workDay={editorWorkDay}
+            onClose={() => setEditorVisible(false)}
+            onSave={async (updated) => {
+              await handleSaveWorkDay(updated);
+              setEditorVisible(false);
+            }}
+          />
+        );
+      })()}
     </>
   );
 }

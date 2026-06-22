@@ -3,7 +3,8 @@ import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, Alert } fro
 import { useColors } from '@/hooks/use-colors';
 import { WorkDay, WorkEventType } from '@/shared/types/workday';
 import { WorkDayValidator, ValidationError } from '@/lib/storage/workdayValidationService';
-import { addWorkEvent } from '@/lib/storage/workdayService';
+import { addWorkEvent, rebuildWorkDayFromEvents } from '@/lib/storage/workdayService';
+import { calculateWorkDayStats, formatTimeShort } from '@/lib/storage/workdayStatsService';
 import { cn } from '@/lib/utils';
 
 interface WorkDayEventEditorProps {
@@ -139,6 +140,45 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
       return;
     }
 
+    // Предупреждение если время выходит за пределы рабочего дня
+    const boundsWarnings = validateTimeOutOfBounds(timestamp);
+    if (boundsWarnings.length > 0) {
+      setValidationErrors(boundsWarnings);
+      // Показываем предупреждение, но не блокируем сохранение
+      Alert.alert(
+        'Предупреждение',
+        boundsWarnings[0].message + '\n\nВы можете продолжить или выбрать другое время.',
+        [
+          { text: 'Изменить время', style: 'cancel' },
+          {
+            text: 'Продолжить',
+            onPress: async () => {
+              const updatedWorkDay = {
+                ...workDay,
+                events: workDay.events.map(e =>
+                  e.id === eventId ? { ...e, timestamp } : e
+                ),
+              };
+              try {
+                setIsSaving(true);
+                await onSave(updatedWorkDay);
+                setEditingEventId(null);
+                setEditingTime('');
+                setSelectedEventId(null);
+                setValidationErrors([]);
+              } catch (error) {
+                console.error('Ошибка при редактировании события:', error);
+                Alert.alert('Ошибка', 'Не удалось сохранить изменения');
+              } finally {
+                setIsSaving(false);
+              }
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     const updatedWorkDay = {
       ...workDay,
       events: workDay.events.map(e =>
@@ -169,8 +209,53 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
     }
   };
 
+  /**
+   * Вычисляет влияние удаления события на итоговое рабочее время
+   */
+  const calcDeleteImpact = (eventId: string): string => {
+    const statsBefore = calculateWorkDayStats(rebuildWorkDayFromEvents(workDay));
+    const afterWorkDay = rebuildWorkDayFromEvents({
+      ...workDay,
+      events: workDay.events.filter(e => e.id !== eventId),
+    });
+    const statsAfter = calculateWorkDayStats(afterWorkDay);
+    const diffMs = statsBefore.totalWorkMs - statsAfter.totalWorkMs;
+    if (diffMs <= 0) return '';
+    return `\n\nВлияние на рабочее время: −${formatTimeShort(diffMs)}`;
+  };
+
+  /**
+   * Проверяет, что новое время не выходит за пределы рабочего дня
+   */
+  const validateTimeOutOfBounds = (timestamp: string): ValidationError[] => {
+    const warnings: ValidationError[] = [];
+    const sorted = [...workDay.events].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+    const workStart = sorted.find(e => e.type === 'work_start');
+    const workEnd = sorted.find(e => e.type === 'work_end');
+    const newMs = new Date(timestamp).getTime();
+    if (workStart && newMs < new Date(workStart.timestamp).getTime()) {
+      warnings.push({
+        code: 'TIME_BEFORE_WORK_START',
+        message: 'Время события раньше начала рабочего дня',
+        severity: 'warning',
+      });
+    }
+    if (workEnd && newMs > new Date(workEnd.timestamp).getTime()) {
+      warnings.push({
+        code: 'TIME_AFTER_WORK_END',
+        message: 'Время события позже завершения рабочего дня',
+        severity: 'warning',
+      });
+    }
+    return warnings;
+  };
+
   const handleDeleteEvent = async (eventId: string) => {
-    Alert.alert('Удалить событие?', 'Это действие нельзя отменить', [
+    const impact = calcDeleteImpact(eventId);
+    const message = `Это действие нельзя отменить.${impact}`;
+    Alert.alert('Удалить событие?', message, [
       { text: 'Отмена', style: 'cancel' },
       {
         text: 'Удалить',
