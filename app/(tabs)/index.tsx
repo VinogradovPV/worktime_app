@@ -5,6 +5,7 @@ import { useWorkDay } from '@/hooks/useWorkDay';
 import { WorkDayTimer } from '@/components/WorkDayTimer';
 import { WorkDayActions } from '@/components/WorkDayActions';
 import { WorkDayHistory } from '@/components/WorkDayHistory';
+import { RecommendationsSummary } from '@/components/RecommendationsSummary';
 import * as Haptics from 'expo-haptics';
 
 export default function HomeScreen() {
@@ -66,6 +67,11 @@ export default function HomeScreen() {
           />
         </View>
 
+        {/* Рекомендации */}
+        <View className="mb-8">
+          <RecommendationsSummary />
+        </View>
+
         {/* История событий */}
         {workDay && workDay.events.length > 0 && (
           <View className="mb-8">
@@ -82,6 +88,8 @@ export default function HomeScreen() {
             </Text>
           </View>
         )}
+
+        <View style={{ height: 20 }} />
       </ScrollView>
     </ScreenContainer>
   );
