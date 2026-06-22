@@ -5,6 +5,7 @@ import { useColors } from '@/hooks/use-colors';
 import { WorkDay } from '@/shared/types/workday';
 import { calculateWorkDayStats, formatTime, formatTimeShort, getWorkDayStatusText, getWorkDayStatusColor } from '@/lib/storage/workdayStatsService';
 import { getActiveBreakInterval, getActiveTemporaryExitInterval } from '@/lib/storage/workdayService';
+import { AnimatedTimer } from './AnimatedTimer';
 
 interface WorkDayTimerProps {
   workDay: WorkDay | null;
@@ -68,31 +69,11 @@ export function WorkDayTimer({ workDay }: WorkDayTimerProps) {
       {/* Главный таймер */}
       <View className="items-center gap-3">
         <Text className="text-sm text-muted">Отработано</Text>
-        {/* Одаптивный размер круга в зависимости от ширины экрана */}
-        <View
-          style={{
-            width: Math.min(screenWidth - 32, 200),
-            height: Math.min(screenWidth - 32, 200),
-            borderRadius: Math.min(screenWidth - 32, 200) / 2,
-            backgroundColor: colors.primary,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.6}
-            style={{
-              fontSize: 48,
-              fontWeight: 'bold',
-              color: 'white',
-              paddingHorizontal: 12,
-            }}
-          >
-            {formatTime(stats.totalWorkMs)}
-          </Text>
-        </View>
+        <AnimatedTimer 
+          time={formatTime(stats.totalWorkMs)} 
+          isRunning={workDay.status === 'working'}
+          size={Math.min(screenWidth - 32, 200)}
+        />
         <Text className="text-lg font-semibold text-foreground">
           {formatTimeShort(stats.totalWorkMs)}
         </Text>

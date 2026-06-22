@@ -2,6 +2,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
+import { useI18n } from '@/hooks/useI18n';
 import { useWorkDay } from '@/hooks/useWorkDay';
 import { WorkDayTimer } from '@/components/WorkDayTimer';
 import { WorkDayActions } from '@/components/WorkDayActions';
@@ -12,6 +13,7 @@ import * as Haptics from 'expo-haptics';
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const { workDay, loading, error, stats, availableActions, performAction, refresh } = useWorkDay();
 
   const handleAction = async (action: string) => {
@@ -35,7 +37,7 @@ export default function HomeScreen() {
         {/* Заголовок */}
         <View className="flex-row justify-between items-center mb-6" style={{ marginTop: insets.top + 8 }}>
           <View>
-            <Text className="text-3xl font-bold text-foreground mt-2">Worktime</Text>
+            <Text className="text-3xl font-bold text-foreground mt-2">{t('home.title')}</Text>
             <Text className="text-sm text-muted mt-1">
               {new Date().toLocaleDateString('ru-RU', {
                 weekday: 'long',
