@@ -800,3 +800,5 @@
 
 - [x] Убрать двойной paddingTop в CalendarHeader (safe area попадала под Dynamic Island)
 - [x] Исправить месячный календарь: числа теперь начинаются с понедельника (Monday-first grid)
+
+- [x] Исправить SyncStatusIndicator: перенести animatedStyle на Animated.View (ошибка замороженного объекта в Expo Go)

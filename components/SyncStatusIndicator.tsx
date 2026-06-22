@@ -62,11 +62,10 @@ export function SyncStatusIndicator({
   };
 
   return (
-    <Animated.View>
+    <Animated.View style={animatedStyle}>
       <Pressable
         onPress={handleSyncPress}
         disabled={syncStatus.isSyncing}
-        style={animatedStyle}
       >
         <View
           className={cn(
