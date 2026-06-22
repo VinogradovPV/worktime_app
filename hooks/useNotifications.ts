@@ -13,6 +13,7 @@ import {
   saveProductionCalendar,
   isWorkday,
 } from "@/lib/storage/notificationSettings";
+import { getTodayWorkDay } from "@/lib/storage/workdayService";
 
 export function useNotifications() {
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
@@ -149,7 +150,7 @@ export function useNotifications() {
       const wasYesterdayWorkday = await isWorkday(yesterdayStr);
 
       if (wasYesterdayWorkday && settings.eveningNotificationEnabled) {
-        // Запланировать утреннее уведомление в 10:00 с отчетом за предыдущий рабочий день
+        // Запланировать утренное уведомление в 10:00 с отчетом за предыдущий рабочий день
         const [hours, minutes] = settings.eveningNotificationTime.split(":").map(Number);
         const notificationTime = new Date(today);
         notificationTime.setHours(hours, minutes, 0, 0);
@@ -166,6 +167,38 @@ export function useNotifications() {
               seconds: Math.max(1, Math.round((notificationTime.getTime() - new Date().getTime()) / 1000)),
             } as any,
           });
+        }
+      }
+
+      // Напоминание о завершении рабочего дня
+      const endOfDayEnabled = settings.endOfDayReminderEnabled ?? true;
+      const endOfDayTime = settings.endOfDayReminderTime ?? "18:00";
+      const todayStr = today.toISOString().split("T")[0];
+      const isTodayWorkday = await isWorkday(todayStr);
+
+      if (isTodayWorkday && endOfDayEnabled) {
+        // Проверяем, не завершён ли день
+        const todayWorkDay = await getTodayWorkDay();
+        const isCompleted = todayWorkDay?.status === "completed";
+
+        if (!isCompleted) {
+          const [eodHours, eodMinutes] = endOfDayTime.split(":").map(Number);
+          const eodNotificationTime = new Date(today);
+          eodNotificationTime.setHours(eodHours, eodMinutes, 0, 0);
+
+          if (eodNotificationTime > new Date()) {
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: "Не забудьте завершить день",
+                body: "Не забудьте отметить окончание рабочего дня",
+                sound: "default",
+              },
+              trigger: {
+                type: "timeInterval",
+                seconds: Math.max(1, Math.round((eodNotificationTime.getTime() - new Date().getTime()) / 1000)),
+              } as any,
+            });
+          }
         }
       }
     } catch (error) {

@@ -23,6 +23,10 @@ import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 import { syncService } from "@/lib/sync/syncService";
 import { autoSyncService } from "@/lib/sync/autoSyncService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
+
+const ONBOARDING_KEY = "onboarding_completed";
 
 // Mark work day as modified when it changes
 const markWorkDayModified = (date: string) => {
@@ -45,6 +49,23 @@ export default function RootLayout() {
 
   // Предзагрузка шрифта MaterialIcons — не блокируем рендер (иконки появятся после загрузки)
   Font.useFonts(MaterialIcons.font);
+
+  const router = useRouter();
+
+  // Проверка первого запуска — показываем онбординг если не пройден
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      try {
+        const completed = await AsyncStorage.getItem(ONBOARDING_KEY);
+        if (!completed) {
+          router.replace("/onboarding");
+        }
+      } catch (error) {
+        console.error("Ошибка при проверке онбординга:", error);
+      }
+    };
+    checkOnboarding();
+  }, []);
 
   // Initialize Manus runtime for cookie injection from parent container
   useEffect(() => {
@@ -125,6 +146,7 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="oauth/callback" />
+            <Stack.Screen name="onboarding" />
           </Stack>
           <StatusBar style="auto" />
         </QueryClientProvider>

@@ -16,6 +16,8 @@ export default function SettingsScreen() {
   const [eveningTime, setEveningTime] = useState("10:00");
   const [morningEnabled, setMorningEnabled] = useState(true);
   const [eveningEnabled, setEveningEnabled] = useState(true);
+  const [endOfDayEnabled, setEndOfDayEnabled] = useState(true);
+  const [endOfDayTime, setEndOfDayTime] = useState("18:00");
   const [vacationStartDate, setVacationStartDate] = useState("");
   const [vacationEndDate, setVacationEndDate] = useState("");
   const [vacationType, setVacationType] = useState<"vacation" | "sick_leave" | "unpaid_leave">("vacation");
@@ -26,6 +28,8 @@ export default function SettingsScreen() {
       setEveningTime(settings.eveningNotificationTime);
       setMorningEnabled(settings.morningNotificationEnabled);
       setEveningEnabled(settings.eveningNotificationEnabled);
+      setEndOfDayEnabled(settings.endOfDayReminderEnabled ?? true);
+      setEndOfDayTime(settings.endOfDayReminderTime ?? "18:00");
     }
   }, [settings]);
 
@@ -37,6 +41,8 @@ export default function SettingsScreen() {
         eveningNotificationTime: eveningTime,
         morningNotificationEnabled: morningEnabled,
         eveningNotificationEnabled: eveningEnabled,
+        endOfDayReminderEnabled: endOfDayEnabled,
+        endOfDayReminderTime: endOfDayTime,
       });
       Alert.alert("Успешно", "Настройки уведомлений сохранены");
     } catch (error) {
@@ -149,6 +155,32 @@ export default function SettingsScreen() {
                   value={eveningTime}
                   onChangeText={setEveningTime}
                   placeholder="10:00"
+                  placeholderTextColor={colors.muted}
+                  className="border rounded-lg p-3 text-foreground"
+                  style={{ borderColor: colors.border }}
+                  maxLength={5}
+                />
+              </View>
+            )}
+          </View>
+
+          {/* Напоминание о завершении дня */}
+          <View className="rounded-lg p-4 mb-4" style={{ backgroundColor: colors.surface }}>
+            <View className="flex-row justify-between items-center mb-3">
+              <Text className="font-semibold text-foreground">Напоминание о завершении дня</Text>
+              <Switch
+                value={endOfDayEnabled}
+                onValueChange={setEndOfDayEnabled}
+                trackColor={{ false: colors.border, true: colors.success }}
+              />
+            </View>
+            {endOfDayEnabled && (
+              <View>
+                <Text className="text-xs text-muted mb-2">Время уведомления (HH:mm)</Text>
+                <TextInput
+                  value={endOfDayTime}
+                  onChangeText={setEndOfDayTime}
+                  placeholder="18:00"
                   placeholderTextColor={colors.muted}
                   className="border rounded-lg p-3 text-foreground"
                   style={{ borderColor: colors.border }}

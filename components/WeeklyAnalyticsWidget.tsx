@@ -8,6 +8,7 @@ import {
   getPeriodEnd,
 } from '@/lib/storage/reportStatsService';
 import * as Haptics from 'expo-haptics';
+import { getUserProfile } from '@/lib/storage/userProfileStorage';
 
 interface WeekMetrics {
   avgWorkHours: number;
@@ -63,8 +64,10 @@ export function WeeklyAnalyticsWidget() {
       const totalWorkMs = workedDays.reduce((sum, d) => sum + d.workedMs, 0);
       const avgWorkMs = workedDays.length > 0 ? totalWorkMs / workedDays.length : 0;
 
-      // Норма недели = рабочих дней × 8ч
-      const normWeekMs = workdays.length * 8 * 3_600_000;
+      // Норма недели = рабочих дней × норма из профиля (default 8ч)
+      const profile = await getUserProfile();
+      const normHoursPerDay = profile?.normHoursPerDay ?? 8;
+      const normWeekMs = workdays.length * normHoursPerDay * 3_600_000;
 
       let bestDay: string | null = null;
       if (workedDays.length > 0) {

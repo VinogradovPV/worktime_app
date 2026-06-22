@@ -25,6 +25,8 @@ export interface UserProfile {
   language: "ru" | "en";
   theme: "light" | "dark" | "auto";
   avatar?: string; // Base64 or file URI
+  showNormProgress?: boolean; // Показывать прогресс-бар нормы (default: true)
+  normHoursPerDay?: number;   // Норма часов в день (default: 8)
   createdAt: string;
   updatedAt: string;
 }

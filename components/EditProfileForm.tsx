@@ -2,6 +2,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert } from "reac
 import { useColors } from "@/hooks/use-colors";
 import { useState } from "react";
 import * as Haptics from "expo-haptics";
+import { Switch } from "react-native";
 import { AvatarUpload } from "./AvatarUpload";
 import type { UserProfile, Department, Inspection } from "@/lib/storage/userProfileStorage";
 
@@ -50,6 +51,8 @@ export function EditProfileForm({
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [avatar, setAvatar] = useState(profile?.avatar || "");
+  const [showNormProgress, setShowNormProgress] = useState<boolean>(profile?.showNormProgress !== false);
+  const [normHoursPerDay, setNormHoursPerDay] = useState<string>(String(profile?.normHoursPerDay ?? 8));
 
   const handleSave = async () => {
     if (!firstName.trim() || !lastName.trim() || !email.trim() || !position.trim()) {
@@ -61,6 +64,7 @@ export function EditProfileForm({
       setIsLoading(true);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
+      const normHours = parseFloat(normHoursPerDay);
       await onSave({
         firstName,
         lastName,
@@ -72,6 +76,8 @@ export function EditProfileForm({
         language,
         theme,
         avatar,
+        showNormProgress,
+        normHoursPerDay: isNaN(normHours) || normHours <= 0 ? 8 : normHours,
       });
 
       Alert.alert("Успешно", "Профиль обновлен");
@@ -349,6 +355,51 @@ export function EditProfileForm({
                 </View>
               )}
             </>
+          )}
+        </View>
+
+        {/* Норма рабочего дня */}
+        <View className="mb-6">
+          <Text className="text-lg font-bold text-foreground mb-3">Норма рабочего дня</Text>
+
+          <View
+            className="rounded-lg p-4 mb-3"
+            style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text className="text-sm font-semibold text-foreground">Показывать прогресс нормы</Text>
+                <Text className="text-xs text-muted mt-1">Прогресс-бар на главном экране</Text>
+              </View>
+              <Switch
+                value={showNormProgress}
+                onValueChange={(val) => {
+                  setShowNormProgress(val);
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                }}
+                trackColor={{ false: colors.border, true: colors.success }}
+              />
+            </View>
+          </View>
+
+          {showNormProgress && (
+            <View
+              className="rounded-lg p-4"
+              style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
+            >
+              <Text className="text-xs text-muted mb-2">Часов в рабочий день</Text>
+              <TextInput
+                value={normHoursPerDay}
+                onChangeText={setNormHoursPerDay}
+                placeholder="8"
+                placeholderTextColor={colors.muted}
+                keyboardType="numeric"
+                returnKeyType="done"
+                className="border rounded-lg p-3 text-foreground"
+                style={{ borderColor: colors.border }}
+                maxLength={4}
+              />
+            </View>
           )}
         </View>
 

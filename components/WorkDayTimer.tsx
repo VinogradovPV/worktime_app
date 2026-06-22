@@ -5,16 +5,17 @@ import { WorkDay } from '@/shared/types/workday';
 import { calculateWorkDayStats, formatTime, formatTimeShort, getWorkDayStatusText, getWorkDayStatusColor } from '@/lib/storage/workdayStatsService';
 import { getActiveBreakInterval, getActiveTemporaryExitInterval } from '@/lib/storage/workdayService';
 import { AnimatedTimer } from './AnimatedTimer';
+import { getUserProfile } from '@/lib/storage/userProfileStorage';
 
 interface WorkDayTimerProps {
   workDay: WorkDay | null;
 }
 
-const WORK_DAY_NORM_MS = 8 * 60 * 60 * 1000; // 8 часов
-
 export function WorkDayTimer({ workDay }: WorkDayTimerProps) {
   const colors = useColors();
   const [now, setNow] = useState(new Date());
+  const [normHoursPerDay, setNormHoursPerDay] = useState(8);
+  const [showNormProgress, setShowNormProgress] = useState(true);
   const screenWidth = Dimensions.get('window').width;
 
   useEffect(() => {
@@ -22,6 +23,16 @@ export function WorkDayTimer({ workDay }: WorkDayTimerProps) {
       setNow(new Date());
     }, 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Загружаем настройки нормы из профиля
+  useEffect(() => {
+    getUserProfile().then((profile) => {
+      if (profile) {
+        setNormHoursPerDay(profile.normHoursPerDay ?? 8);
+        setShowNormProgress(profile.showNormProgress !== false);
+      }
+    });
   }, []);
 
   if (!workDay) {
@@ -43,7 +54,8 @@ export function WorkDayTimer({ workDay }: WorkDayTimerProps) {
   }
 
   // Прогресс нормы рабочего дня (0..1)
-  const normProgress = Math.min(stats.totalWorkMs / WORK_DAY_NORM_MS, 1);
+  const normMs = normHoursPerDay * 60 * 60 * 1000;
+  const normProgress = Math.min(stats.totalWorkMs / normMs, 1);
   const normPercent = Math.round(normProgress * 100);
   const normColor = normProgress >= 1 ? colors.success : normProgress >= 0.75 ? colors.primary : normProgress >= 0.5 ? colors.warning : colors.muted;
 
@@ -83,7 +95,7 @@ export function WorkDayTimer({ workDay }: WorkDayTimerProps) {
       </View>
 
       {/* Прогресс нормы рабочего дня */}
-      {workDay.status !== 'not_started' && (
+      {showNormProgress && workDay.status !== 'not_started' && (
         <View
           style={{
             backgroundColor: colors.surface,
@@ -98,7 +110,7 @@ export function WorkDayTimer({ workDay }: WorkDayTimerProps) {
               Норма рабочего дня
             </Text>
             <Text style={{ fontSize: 12, fontWeight: '700', color: normColor }}>
-              {normPercent}% · {formatTimeShort(stats.totalWorkMs)} / 8ч
+              {normPercent}% · {formatTimeShort(stats.totalWorkMs)} / {normHoursPerDay}ч
             </Text>
           </View>
           <View

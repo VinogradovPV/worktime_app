@@ -5,6 +5,8 @@ export interface NotificationSettings {
   eveningNotificationTime: string; // HH:mm формат, по умолчанию "10:00"
   morningNotificationEnabled: boolean; // Включено ли уведомление о начале дня
   eveningNotificationEnabled: boolean; // Включено ли уведомление о времени работы за предыдущий день
+  endOfDayReminderEnabled: boolean; // Напоминание о завершении рабочего дня
+  endOfDayReminderTime: string;    // HH:mm формат, по умолчанию "18:00"
 }
 
 export interface VacationPeriod {
@@ -43,6 +45,8 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
       eveningNotificationTime: "10:00",
       morningNotificationEnabled: true,
       eveningNotificationEnabled: true,
+      endOfDayReminderEnabled: true,
+      endOfDayReminderTime: "18:00",
     };
   } catch (error) {
     console.error("Ошибка при получении настроек уведомлений:", error);
@@ -51,6 +55,8 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
       eveningNotificationTime: "10:00",
       morningNotificationEnabled: true,
       eveningNotificationEnabled: true,
+      endOfDayReminderEnabled: true,
+      endOfDayReminderTime: "18:00",
     };
   }
 }
