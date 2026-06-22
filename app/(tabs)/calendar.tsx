@@ -304,8 +304,8 @@ export default function CalendarScreen() {
   };
 
   return (
-    <ScreenContainer className="p-0 flex-1">
-      {/* Заголовок с переключателем режимов */}
+    <ScreenContainer className="p-0 flex-1 pt-2">
+      <View className="px-2">
       <CalendarHeader
         mode={calendarMode}
         onModeChange={setCalendarMode}
@@ -525,6 +525,7 @@ export default function CalendarScreen() {
           setSelectedDayForDetail(null);
         }}
       />
+      </View>
     </ScreenContainer>
   );
 }

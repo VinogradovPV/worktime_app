@@ -21,12 +21,12 @@ export default function HomeScreen() {
   };
 
   return (
-    <ScreenContainer className="p-4">
+    <ScreenContainer className="px-4 pt-2">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
         {/* Заголовок */}
-        <View className="flex-row justify-between items-center mb-8">
+        <View className="flex-row justify-between items-center mb-6 mt-2">
           <View>
-            <Text className="text-3xl font-bold text-foreground">Worktime</Text>
+            <Text className="text-3xl font-bold text-foreground mt-2">Worktime</Text>
             <Text className="text-sm text-muted mt-1">
               {new Date().toLocaleDateString('ru-RU', {
                 weekday: 'long',
