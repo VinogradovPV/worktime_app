@@ -72,7 +72,7 @@ export function RecommendationsSummary({ onNavigateToAnalytics }: Recommendation
     if (onNavigateToAnalytics) {
       onNavigateToAnalytics();
     } else {
-      router.push('/(tabs)/analytics');
+      router.push({ pathname: '/(tabs)/analytics', params: { section: 'recommendations' } });
     }
   };
 

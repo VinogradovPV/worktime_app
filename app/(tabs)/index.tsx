@@ -8,6 +8,7 @@ import { WorkDayTimer } from '@/components/WorkDayTimer';
 import { WorkDayActions } from '@/components/WorkDayActions';
 import { WorkDayHistory } from '@/components/WorkDayHistory';
 import { RecommendationsSummary } from '@/components/RecommendationsSummary';
+import { WeeklyAnalyticsWidget } from '@/components/WeeklyAnalyticsWidget';
 import * as Haptics from 'expo-haptics';
 
 export default function HomeScreen() {
@@ -64,6 +65,11 @@ export default function HomeScreen() {
           ) : (
             <WorkDayTimer workDay={workDay} />
           )}
+        </View>
+
+        {/* Виджет аналитики недели */}
+        <View className="mb-6">
+          <WeeklyAnalyticsWidget />
         </View>
 
         {/* Кнопки действий */}

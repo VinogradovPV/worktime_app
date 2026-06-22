@@ -30,12 +30,23 @@ import {
 } from '@/lib/storage/reportStatsService';
 import { getWorkDay } from '@/lib/storage/workdayService';
 import * as Haptics from 'expo-haptics';
+import { useLocalSearchParams } from 'expo-router';
 
 type AnalyticsTab = 'trends' | 'distribution' | 'comparison' | 'recommendations';
 
 export default function AnalyticsScreen() {
   const colors = useColors();
-  const [activeTab, setActiveTab] = useState<AnalyticsTab>('trends');
+  const { section } = useLocalSearchParams<{ section?: string }>();
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>(
+    section === 'recommendations' ? 'recommendations' : 'trends'
+  );
+
+  // Обновить вкладку при изменении параметра section (навигация из главного экрана)
+  useEffect(() => {
+    if (section === 'recommendations') {
+      setActiveTab('recommendations');
+    }
+  }, [section]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
