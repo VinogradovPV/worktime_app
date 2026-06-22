@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Dimensions, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/use-colors';
 import { WorkDay } from '@/shared/types/workday';
 import { calculateWorkDayStats, formatTime, formatTimeShort, getWorkDayStatusText, getWorkDayStatusColor } from '@/lib/storage/workdayStatsService';
@@ -11,7 +12,9 @@ interface WorkDayTimerProps {
 
 export function WorkDayTimer({ workDay }: WorkDayTimerProps) {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const [now, setNow] = useState(new Date());
+  const screenWidth = Dimensions.get('window').width;
 
   // Обновляем текущее время каждую секунду
   useEffect(() => {
@@ -65,15 +68,32 @@ export function WorkDayTimer({ workDay }: WorkDayTimerProps) {
       {/* Главный таймер */}
       <View className="items-center gap-3">
         <Text className="text-sm text-muted">Отработано</Text>
+        {/* Одаптивный размер круга в зависимости от ширины экрана */}
         <View
-          className="w-40 h-40 rounded-full items-center justify-center"
-          style={{ backgroundColor: colors.primary }}
+          style={{
+            width: Math.min(screenWidth - 32, 200),
+            height: Math.min(screenWidth - 32, 200),
+            borderRadius: Math.min(screenWidth - 32, 200) / 2,
+            backgroundColor: colors.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         >
-          <Text className="text-5xl font-bold text-white">
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.6}
+            style={{
+              fontSize: 48,
+              fontWeight: 'bold',
+              color: 'white',
+              paddingHorizontal: 12,
+            }}
+          >
             {formatTime(stats.totalWorkMs)}
           </Text>
         </View>
-        <Text className="text-2xl font-bold text-foreground">
+        <Text className="text-lg font-semibold text-foreground">
           {formatTimeShort(stats.totalWorkMs)}
         </Text>
       </View>
@@ -92,21 +112,21 @@ export function WorkDayTimer({ workDay }: WorkDayTimerProps) {
 
       {/* Статистика */}
       <View className="flex-row gap-3">
-        <View className="flex-1 bg-surface rounded-lg p-3 items-center">
-          <Text className="text-xs text-muted mb-1">Перерывы</Text>
-          <Text className="text-lg font-bold text-foreground">
+        <View className="flex-1 bg-surface rounded-lg p-4 items-center" style={{ borderColor: colors.border, borderWidth: 1 }}>
+          <Text className="text-xs font-semibold text-muted mb-2">Перерывы</Text>
+          <Text className="text-xl font-bold text-foreground">
             {formatTimeShort(stats.totalBreakMs)}
           </Text>
         </View>
-        <View className="flex-1 bg-surface rounded-lg p-3 items-center">
-          <Text className="text-xs text-muted mb-1">Выходы</Text>
-          <Text className="text-lg font-bold text-foreground">
+        <View className="flex-1 bg-surface rounded-lg p-4 items-center" style={{ borderColor: colors.border, borderWidth: 1 }}>
+          <Text className="text-xs font-semibold text-muted mb-2">Выходы</Text>
+          <Text className="text-xl font-bold text-foreground">
             {formatTimeShort(stats.totalTemporaryExitMs)}
           </Text>
         </View>
-        <View className="flex-1 bg-surface rounded-lg p-3 items-center">
-          <Text className="text-xs text-muted mb-1">95% норма</Text>
-          <Text className="text-lg font-bold text-foreground">
+        <View className="flex-1 bg-surface rounded-lg p-4 items-center" style={{ borderColor: colors.border, borderWidth: 1 }}>
+          <Text className="text-xs font-semibold text-muted mb-2">95% времени</Text>
+          <Text className="text-xl font-bold text-foreground">
             {formatTimeShort(stats.work95Ms)}
           </Text>
         </View>
