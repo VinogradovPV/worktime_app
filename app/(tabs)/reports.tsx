@@ -1,12 +1,14 @@
-import { ScrollView, Text, View, TouchableOpacity, FlatList } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { AnimatedPeriodSelector } from "@/components/AnimatedPeriodSelector";
 import { InteractiveWorkChart } from "@/components/InteractiveWorkChart";
 import { AnimatedStatsGrid, AnimatedStatsCard } from "@/components/AnimatedStatsCard";
 import { AnimatedDetailsList } from "@/components/AnimatedDetailsList";
 import { AnimatedLoadingState } from "@/components/AnimatedLoadingState";
+import { ExportOptionsModal } from "@/components/ExportOptionsModal";
 import { useColors } from "@/hooks/use-colors";
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { View, Text, ScrollView, Pressable } from "react-native";
+import * as Haptics from "expo-haptics";
 import {
   getPeriodStats,
   getDayStatsForPeriod,
@@ -17,6 +19,8 @@ import {
   ReportPeriodStats,
   ReportDayStats,
 } from "@/lib/storage/reportStatsService";
+import { exportReportToCSV, shareCSVFile } from "@/lib/export/exportToCSV";
+import { exportReportToPDF, sharePDFFile } from "@/lib/export/exportToPDF";
 
 export default function ReportsScreen() {
   const colors = useColors();
@@ -25,6 +29,8 @@ export default function ReportsScreen() {
   const [dayStats, setDayStats] = useState<ReportDayStats[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     loadReportData();
@@ -86,6 +92,42 @@ export default function ReportsScreen() {
     // Обработка нажатия на день графика
     console.log("Выбран день:", day.date);
   }, []);
+
+  const handleExport = useCallback(
+    async (format: "csv" | "pdf") => {
+      if (!periodStats) return;
+
+      try {
+        setIsExporting(true);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+        const startDate = getPeriodStart(currentDate, selectedPeriod);
+        const endDate = getPeriodEnd(currentDate, selectedPeriod);
+        const fileName = `report_${startDate.toISOString().split("T")[0]}_${endDate.toISOString().split("T")[0]}.${format}`;
+
+        const statsWithDates = {
+          ...periodStats,
+          startDate: startDate.toISOString().split("T")[0],
+          endDate: endDate.toISOString().split("T")[0],
+        };
+
+        let filePath: string;
+        if (format === "csv") {
+          filePath = await exportReportToCSV(statsWithDates, dayStats, fileName);
+          await shareCSVFile(filePath, fileName);
+        } else {
+          filePath = await exportReportToPDF(statsWithDates, dayStats, fileName);
+          await sharePDFFile(filePath, fileName);
+        }
+      } catch (error) {
+        console.error("Ошибка при экспорте:", error);
+        throw error;
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [periodStats, currentDate, selectedPeriod, dayStats]
+  );
 
   const getPeriodLabel = (): string => {
     const startDate = getPeriodStart(currentDate, selectedPeriod);
@@ -226,7 +268,25 @@ export default function ReportsScreen() {
     <ScreenContainer className="p-4">
       <View className="flex-row justify-between items-center mb-6">
         <Text className="text-3xl font-bold text-foreground">Отчеты</Text>
+        <Pressable
+          onPress={() => setShowExportModal(true)}
+          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+        >
+          <View
+            className="p-2 rounded-lg"
+            style={{ backgroundColor: colors.primary }}
+          >
+            <Text className="text-lg">📥</Text>
+          </View>
+        </Pressable>
       </View>
+
+      <ExportOptionsModal
+        visible={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        onExport={handleExport}
+        isLoading={isExporting}
+      />
 
       {/* Анимированный переключатель периодов */}
       <AnimatedPeriodSelector
