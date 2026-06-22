@@ -2,6 +2,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert } from "reac
 import { useColors } from "@/hooks/use-colors";
 import { useState } from "react";
 import * as Haptics from "expo-haptics";
+import { AvatarUpload } from "./AvatarUpload";
 import type { UserProfile, Department, Inspection } from "@/lib/storage/userProfileStorage";
 
 interface EditProfileFormProps {
@@ -48,6 +49,7 @@ export function EditProfileForm({
   const [showInspectionPicker, setShowInspectionPicker] = useState(false);
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
+  const [avatar, setAvatar] = useState(profile?.avatar || "");
 
   const handleSave = async () => {
     if (!firstName.trim() || !lastName.trim() || !email.trim() || !position.trim()) {
@@ -69,6 +71,7 @@ export function EditProfileForm({
         inspectionId: selectedInspectionId,
         language,
         theme,
+        avatar,
       });
 
       Alert.alert("Успешно", "Профиль обновлен");
@@ -142,6 +145,14 @@ export function EditProfileForm({
   return (
     <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
       <View className="p-4 gap-4">
+        {/* Аватар */}
+        <View className="items-center py-4">
+          <AvatarUpload
+            currentAvatar={avatar}
+            onAvatarSelected={setAvatar}
+          />
+        </View>
+
         {/* Личные данные */}
         <View>
           <Text className="text-lg font-bold text-foreground mb-3">Личные данные</Text>

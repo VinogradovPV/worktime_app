@@ -24,6 +24,7 @@ export interface UserProfile {
   position: string;
   language: "ru" | "en";
   theme: "light" | "dark" | "auto";
+  avatar?: string; // Base64 or file URI
   createdAt: string;
   updatedAt: string;
 }
