@@ -1,12 +1,16 @@
 import { ScrollView, Text, View, TouchableOpacity, TextInput, Switch, Alert } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
+import { useI18n } from "@/hooks/useI18n";
 import { useNotifications } from "@/hooks/useNotifications";
+import { LanguageSelector } from "@/components/LanguageSelector";
+import { ThemeSelector } from "@/components/ThemeSelector";
 import { useState, useEffect } from "react";
 import * as Haptics from "expo-haptics";
 
 export default function SettingsScreen() {
   const colors = useColors();
+  const { t } = useI18n();
   const { settings, vacationPeriods, updateSettings, addVacation, removeVacation } = useNotifications();
   const [morningTime, setMorningTime] = useState("09:30");
   const [eveningTime, setEveningTime] = useState("10:00");
@@ -85,7 +89,17 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
         {/* Заголовок */}
         <View className="mb-8">
-          <Text className="text-3xl font-bold text-foreground">Настройки</Text>
+          <Text className="text-3xl font-bold text-foreground">{t('settings.title')}</Text>
+        </View>
+
+        {/* Выбор языка */}
+        <View className="mb-8 rounded-lg p-4" style={{ backgroundColor: colors.surface }}>
+          <LanguageSelector />
+        </View>
+
+        {/* Выбор темы */}
+        <View className="mb-8 rounded-lg p-4" style={{ backgroundColor: colors.surface }}>
+          <ThemeSelector />
         </View>
 
         {/* Раздел уведомлений */}
