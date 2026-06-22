@@ -9,6 +9,7 @@ import { WorkDayActions } from '@/components/WorkDayActions';
 import { WorkDayHistory } from '@/components/WorkDayHistory';
 import { RecommendationsSummary } from '@/components/RecommendationsSummary';
 import { WeeklyAnalyticsWidget } from '@/components/WeeklyAnalyticsWidget';
+import { TodayEventsCard } from '@/components/TodayEventsCard';
 import * as Haptics from 'expo-haptics';
 
 export default function HomeScreen() {
@@ -72,6 +73,13 @@ export default function HomeScreen() {
           <WeeklyAnalyticsWidget />
         </View>
 
+        {/* Карточка событий дня */}
+        {workDay && workDay.events.length > 0 && (
+          <View className="mb-6">
+            <TodayEventsCard workDay={workDay} onWorkDayUpdated={refresh} />
+          </View>
+        )}
+
         {/* Кнопки действий */}
         <View className="mb-8">
           <WorkDayActions
@@ -91,7 +99,6 @@ export default function HomeScreen() {
         {/* История событий */}
         {workDay && workDay.events.length > 0 && (
           <View className="mb-8">
-            <Text className="text-lg font-semibold text-foreground mb-4">История событий</Text>
             <WorkDayHistory workDay={workDay} />
           </View>
         )}

@@ -72,6 +72,11 @@ export function WorkDayTimer({ workDay }: WorkDayTimerProps) {
         <AnimatedTimer 
           time={formatTime(stats.totalWorkMs)} 
           isRunning={workDay.status === 'working'}
+          status={
+            workDay.status === 'working' ? 'working' :
+            workDay.status === 'on_break' ? 'break' :
+            workDay.status === 'on_temporary_exit' ? 'exit' : 'idle'
+          }
           size={Math.min(screenWidth - 32, 200)}
         />
         <Text className="text-lg font-semibold text-foreground">

@@ -1,38 +1,43 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   ScrollView,
   Pressable,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
 import { TrendChart } from '@/components/charts/TrendChart';
 import { WeeklyDistributionChart } from '@/components/charts/WeeklyDistributionChart';
 import { ComparisonChart } from '@/components/charts/ComparisonChart';
+import { HeatmapChart } from '@/components/charts/HeatmapChart';
+import { HourlyActivityChart } from '@/components/charts/HourlyActivityChart';
 import { RecommendationCard } from '@/components/RecommendationCard';
+import { ExportOptionsModal } from '@/components/ExportOptionsModal';
 import {
   calculateTrend,
-  identifyActivityPeaks,
   comparePeriods,
   calculateWeeklyDistribution,
+  calculateHourlyActivity,
   generateRecommendations,
   TrendData,
   WeeklyDistribution,
   PeriodComparison,
   Recommendation,
+  HourlyActivity,
 } from '@/lib/services/analyticsService';
 import {
   getPeriodStart,
   getPeriodEnd,
   getDayStatsForPeriod,
 } from '@/lib/storage/reportStatsService';
-import { getWorkDay } from '@/lib/storage/workdayService';
+import { exportAnalyticsToPDF, exportAnalyticsToCSV } from '@/lib/export/analyticsExportService';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams } from 'expo-router';
 
-type AnalyticsTab = 'trends' | 'distribution' | 'comparison' | 'recommendations';
+type AnalyticsTab = 'trends' | 'distribution' | 'comparison' | 'heatmap' | 'recommendations';
 
 export default function AnalyticsScreen() {
   const colors = useColors();
@@ -56,6 +61,9 @@ export default function AnalyticsScreen() {
   const [weeklyDist, setWeeklyDist] = useState<WeeklyDistribution[]>([]);
   const [comparison, setComparison] = useState<PeriodComparison | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [hourlyActivity, setHourlyActivity] = useState<HourlyActivity[]>([]);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Загрузка данных
   useEffect(() => {
@@ -109,10 +117,13 @@ export default function AnalyticsScreen() {
       const comp = comparePeriods(prevWorkDays, currentWorkDays);
       const recs = generateRecommendations(currentWorkDays, weekly, trend);
 
+      const hourly = calculateHourlyActivity(currentWorkDays);
+
       setTrendData(trend);
       setWeeklyDist(weekly);
       setComparison(comp);
       setRecommendations(recs);
+      setHourlyActivity(hourly);
     } catch (error) {
       console.error('Ошибка при загрузке аналитики:', error);
     } finally {
@@ -178,24 +189,74 @@ export default function AnalyticsScreen() {
     }
   };
 
+  const handleExport = useCallback(async (format: 'csv' | 'pdf') => {
+    try {
+      setIsExporting(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const reportData = {
+        period: getPeriodLabel(),
+        trendData,
+        weeklyDistribution: weeklyDist,
+        comparison,
+        recommendations,
+        generatedAt: new Date().toLocaleString('ru-RU'),
+      };
+      if (format === 'pdf') {
+        await exportAnalyticsToPDF(reportData);
+      } else {
+        await exportAnalyticsToCSV(reportData);
+      }
+    } catch (error) {
+      console.error('Ошибка при экспорте аналитики:', error);
+      throw error;
+    } finally {
+      setIsExporting(false);
+    }
+  }, [trendData, weeklyDist, comparison, recommendations, getPeriodLabel]);
+
   return (
     <ScreenContainer className="p-4">
       {/* Заголовок */}
-      <View style={{ marginBottom: 16 }}>
-        <Text
-          style={{
-            fontSize: 28,
-            fontWeight: 'bold',
-            color: colors.foreground,
-            marginBottom: 8,
-          }}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontSize: 28,
+              fontWeight: 'bold',
+              color: colors.foreground,
+              marginBottom: 4,
+            }}
+          >
+            📊 Аналитика
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.muted }}>
+            Анализ тенденций и рекомендации по оптимизации
+          </Text>
+        </View>
+        {/* Кнопка экспорта */}
+        <Pressable
+          onPress={() => setShowExportModal(true)}
+          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, marginTop: 4 }]}
         >
-          📊 Аналитика
-        </Text>
-        <Text style={{ fontSize: 13, color: colors.muted }}>
-          Анализ тенденций и рекомендации по оптимизации
-        </Text>
+          <View
+            style={{
+              padding: 8,
+              borderRadius: 8,
+              backgroundColor: colors.primary,
+            }}
+          >
+            <Text style={{ fontSize: 16 }}>📥</Text>
+          </View>
+        </Pressable>
       </View>
+
+      {/* Модальное окно экспорта */}
+      <ExportOptionsModal
+        visible={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        onExport={handleExport}
+        isLoading={isExporting}
+      />
 
       {/* Выбор периода */}
       <View
@@ -285,11 +346,12 @@ export default function AnalyticsScreen() {
       </View>
 
       {/* Вкладки */}
-      <View
-        style={{
-          flexDirection: 'row',
-          gap: 8,
-          marginBottom: 16,
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginBottom: 16 }}
+        contentContainerStyle={{
+          gap: 6,
           backgroundColor: colors.surface,
           borderRadius: 12,
           padding: 4,
@@ -299,6 +361,7 @@ export default function AnalyticsScreen() {
           { id: 'trends' as const, label: 'Тренды' },
           { id: 'distribution' as const, label: 'Распределение' },
           { id: 'comparison' as const, label: 'Сравнение' },
+          { id: 'heatmap' as const, label: 'Тепловая карта' },
           { id: 'recommendations' as const, label: 'Советы' },
         ].map((tab) => (
           <Pressable
@@ -306,9 +369,8 @@ export default function AnalyticsScreen() {
             onPress={() => handleTabChange(tab.id)}
             style={({ pressed }) => [
               {
-                flex: 1,
                 paddingVertical: 10,
-                paddingHorizontal: 8,
+                paddingHorizontal: 14,
                 borderRadius: 8,
                 backgroundColor: activeTab === tab.id ? colors.primary : 'transparent',
                 opacity: pressed ? 0.7 : 1,
@@ -316,9 +378,10 @@ export default function AnalyticsScreen() {
             ]}
           >
             <Text
+              numberOfLines={1}
               style={{
                 textAlign: 'center',
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: '600',
                 color: activeTab === tab.id ? colors.background : colors.foreground,
               }}
@@ -327,7 +390,7 @@ export default function AnalyticsScreen() {
             </Text>
           </Pressable>
         ))}
-      </View>
+      </ScrollView>
 
       {/* Содержимое */}
       {isLoading ? (
@@ -359,6 +422,13 @@ export default function AnalyticsScreen() {
           {activeTab === 'comparison' && comparison && (
             <View>
               <ComparisonChart data={comparison} />
+            </View>
+          )}
+
+          {activeTab === 'heatmap' && (
+            <View>
+              <HeatmapChart data={trendData} />
+              <HourlyActivityChart data={hourlyActivity} />
             </View>
           )}
 

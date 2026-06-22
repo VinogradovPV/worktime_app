@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, Alert } fro
 import { useColors } from '@/hooks/use-colors';
 import { WorkDay, WorkEventType } from '@/shared/types/workday';
 import { WorkDayValidator, ValidationError } from '@/lib/storage/workdayValidationService';
-import { getTodayWorkDay, addWorkEvent } from '@/lib/storage/workdayService';
+import { addWorkEvent } from '@/lib/storage/workdayService';
 import { cn } from '@/lib/utils';
 
 interface WorkDayEventEditorProps {
@@ -16,10 +16,13 @@ interface WorkDayEventEditorProps {
 export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDayEventEditorProps) {
   const colors = useColors();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [editingTime, setEditingTime] = useState<string>('');
   const [isAdding, setIsAdding] = useState(false);
   const [newEventType, setNewEventType] = useState<WorkEventType>('work_start');
+  const [newEventTime, setNewEventTime] = useState<string>('');
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   const eventTypeLabels: Record<WorkEventType, string> = {
     work_start: 'Начало работы',
@@ -39,62 +42,139 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
     temporary_exit_end: colors.primary,
   };
 
+  const parseTimeToISO = (timeStr: string, baseDate?: string): string | null => {
+    const parts = timeStr.trim().split(':');
+    if (parts.length < 2) return null;
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+      return null;
+    }
+    // Используем дату рабочего дня (workDay.date)
+    const dateParts = (baseDate || workDay.date).split('-');
+    const year = parseInt(dateParts[0], 10);
+    const month = parseInt(dateParts[1], 10) - 1;
+    const day = parseInt(dateParts[2], 10);
+    return new Date(year, month, day, hours, minutes, 0).toISOString();
+  };
+
   const handleAddEvent = async () => {
-    if (!editingTime) {
+    if (!newEventTime) {
       Alert.alert('Ошибка', 'Укажите время события');
       return;
     }
 
+    const timestamp = parseTimeToISO(newEventTime);
+    if (!timestamp) {
+      Alert.alert('Ошибка', 'Неверный формат времени (используйте ЧЧ:ММ)');
+      return;
+    }
+
+    // Валидация времени
+    const timeErrors = WorkDayValidator.validateEventTime(workDay, newEventType, timestamp);
+    if (timeErrors.length > 0) {
+      setValidationErrors(timeErrors);
+      Alert.alert('Ошибка', timeErrors[0].message);
+      return;
+    }
+
+    // Добавление события с нужным временем
+    let updatedWorkDay = {
+      ...workDay,
+      events: [
+        ...workDay.events,
+        {
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          type: newEventType,
+          timestamp,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    };
+
+    // Валидация последовательности
+    const sequenceErrors = WorkDayValidator.validateEventSequence(updatedWorkDay);
+    if (sequenceErrors.some(e => e.severity === 'error')) {
+      setValidationErrors(sequenceErrors);
+      Alert.alert('Ошибка', sequenceErrors[0].message);
+      return;
+    }
+
     try {
-      const [hours, minutes] = editingTime.split(':').map(Number);
-      if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-        Alert.alert('Ошибка', 'Неверный формат времени (используйте HH:MM)');
-        return;
-      }
-
-      const today = new Date();
-      const eventDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes);
-      const timestamp = eventDate.toISOString();
-
-      // Валидация времени
-      const timeErrors = WorkDayValidator.validateEventTime(workDay, newEventType, timestamp);
-      if (timeErrors.length > 0) {
-        setValidationErrors(timeErrors);
-        Alert.alert('Ошибка', timeErrors[0].message);
-        return;
-      }
-
-      // Добавление события
-      let updatedWorkDay = addWorkEvent(workDay, newEventType);
-      // Обновить время события
-      const lastEvent = updatedWorkDay.events[updatedWorkDay.events.length - 1];
-      if (lastEvent) {
-        lastEvent.timestamp = timestamp;
-      }
-
-      // Валидация последовательности
-      const sequenceErrors = WorkDayValidator.validateEventSequence(updatedWorkDay);
-      if (sequenceErrors.some(e => e.severity === 'error')) {
-        setValidationErrors(sequenceErrors);
-        Alert.alert('Ошибка', sequenceErrors[0].message);
-        return;
-      }
-
+      setIsSaving(true);
       await onSave(updatedWorkDay);
-      setEditingTime('');
+      setNewEventTime('');
       setIsAdding(false);
       setValidationErrors([]);
     } catch (error) {
       console.error('Ошибка при добавлении события:', error);
       Alert.alert('Ошибка', 'Не удалось добавить событие');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleEditEvent = async (eventId: string) => {
+    if (!editingTime) {
+      Alert.alert('Ошибка', 'Укажите время события');
+      return;
+    }
+
+    const timestamp = parseTimeToISO(editingTime);
+    if (!timestamp) {
+      Alert.alert('Ошибка', 'Неверный формат времени (используйте ЧЧ:ММ)');
+      return;
+    }
+
+    // Проверяем валидность нового времени (исключая текущее событие)
+    const timeErrors = WorkDayValidator.validateEventTime(
+      workDay,
+      workDay.events.find(e => e.id === eventId)?.type as WorkEventType,
+      timestamp,
+      eventId
+    );
+    if (timeErrors.length > 0) {
+      setValidationErrors(timeErrors);
+      Alert.alert('Ошибка', timeErrors[0].message);
+      return;
+    }
+
+    const updatedWorkDay = {
+      ...workDay,
+      events: workDay.events.map(e =>
+        e.id === eventId ? { ...e, timestamp } : e
+      ),
+    };
+
+    // Валидация последовательности
+    const sequenceErrors = WorkDayValidator.validateEventSequence(updatedWorkDay);
+    if (sequenceErrors.some(e => e.severity === 'error')) {
+      setValidationErrors(sequenceErrors);
+      Alert.alert('Ошибка', sequenceErrors[0].message);
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      await onSave(updatedWorkDay);
+      setEditingEventId(null);
+      setEditingTime('');
+      setSelectedEventId(null);
+      setValidationErrors([]);
+    } catch (error) {
+      console.error('Ошибка при редактировании события:', error);
+      Alert.alert('Ошибка', 'Не удалось сохранить изменения');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleDeleteEvent = async (eventId: string) => {
     Alert.alert('Удалить событие?', 'Это действие нельзя отменить', [
-      { text: 'Отмена', onPress: () => {} },
+      { text: 'Отмена', style: 'cancel' },
       {
         text: 'Удалить',
+        style: 'destructive',
         onPress: async () => {
           try {
             const updatedWorkDay = {
@@ -112,6 +192,7 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
 
             await onSave(updatedWorkDay);
             setSelectedEventId(null);
+            setEditingEventId(null);
           } catch (error) {
             console.error('Ошибка при удалении события:', error);
             Alert.alert('Ошибка', 'Не удалось удалить событие');
@@ -126,9 +207,23 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
     return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   };
 
-  const sortedEvents = [...workDay.events].sort((a, b) => 
+  const sortedEvents = [...workDay.events].sort((a, b) =>
     new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
+
+  const startEditEvent = (eventId: string, currentTimestamp: string) => {
+    setEditingEventId(eventId);
+    setEditingTime(formatTime(currentTimestamp));
+    setSelectedEventId(eventId);
+    setIsAdding(false);
+  };
+
+  const cancelEdit = () => {
+    setEditingEventId(null);
+    setEditingTime('');
+    setSelectedEventId(null);
+    setValidationErrors([]);
+  };
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -141,6 +236,9 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
               <Text className="text-lg text-primary">✕</Text>
             </TouchableOpacity>
           </View>
+          <Text className="text-xs text-muted mt-1">
+            {workDay.date} · {sortedEvents.length} событий
+          </Text>
         </View>
 
         {/* Ошибки валидации */}
@@ -157,64 +255,144 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
         {/* Список событий */}
         <ScrollView className="flex-1 px-4 py-4">
           {sortedEvents.length === 0 ? (
-            <Text className="text-center text-muted py-8">Нет событий</Text>
+            <View className="items-center py-12">
+              <Text className="text-4xl mb-4">📋</Text>
+              <Text className="text-center text-muted">Нет событий</Text>
+              <Text className="text-center text-muted text-xs mt-2">
+                Добавьте первое событие с помощью кнопки ниже
+              </Text>
+            </View>
           ) : (
-            sortedEvents.map((event) => (
-              <TouchableOpacity
-                key={event.id}
-                onPress={() => setSelectedEventId(selectedEventId === event.id ? null : event.id)}
-                className="mb-3 p-4 rounded-lg border"
-                style={{
-                  backgroundColor: eventTypeColors[event.type] + '10',
-                  borderColor: eventTypeColors[event.type],
-                }}
-              >
-                <View className="flex-row justify-between items-center">
-                  <View className="flex-1">
-                    <Text className="font-semibold text-foreground">
-                      {eventTypeLabels[event.type]}
-                    </Text>
-                    <Text className="text-sm text-muted mt-1">
-                      {formatTime(event.timestamp)}
-                    </Text>
-                  </View>
-                  {selectedEventId === event.id && (
-                    <TouchableOpacity
-                      onPress={() => handleDeleteEvent(event.id)}
-                      className="ml-4 p-2"
+            sortedEvents.map((event) => {
+              const isSelected = selectedEventId === event.id;
+              const isEditing = editingEventId === event.id;
+              const eventColor = eventTypeColors[event.type];
+
+              return (
+                <View
+                  key={event.id}
+                  className="mb-3 rounded-lg border overflow-hidden"
+                  style={{
+                    backgroundColor: eventColor + '10',
+                    borderColor: isSelected ? eventColor : colors.border,
+                  }}
+                >
+                  {/* Строка события */}
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (isEditing) {
+                        cancelEdit();
+                      } else if (isSelected) {
+                        setSelectedEventId(null);
+                      } else {
+                        setSelectedEventId(event.id);
+                        setEditingEventId(null);
+                      }
+                    }}
+                    className="p-4"
+                  >
+                    <View className="flex-row justify-between items-center">
+                      <View className="flex-1">
+                        <Text className="font-semibold text-foreground">
+                          {eventTypeLabels[event.type]}
+                        </Text>
+                        <Text className="text-sm mt-1" style={{ color: eventColor }}>
+                          {formatTime(event.timestamp)}
+                        </Text>
+                      </View>
+                      <Text className="text-muted text-xs">{isSelected ? '▲' : '▼'}</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Панель действий */}
+                  {isSelected && !isEditing && (
+                    <View
+                      className="flex-row gap-2 px-4 pb-4"
                     >
-                      <Text className="text-lg text-error">🗑</Text>
-                    </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => startEditEvent(event.id, event.timestamp)}
+                        className="flex-1 py-2 rounded-lg items-center"
+                        style={{ backgroundColor: colors.primary + '20', borderWidth: 1, borderColor: colors.primary }}
+                      >
+                        <Text className="text-xs font-semibold text-primary">✏️ Изменить время</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleDeleteEvent(event.id)}
+                        className="flex-1 py-2 rounded-lg items-center"
+                        style={{ backgroundColor: colors.error + '20', borderWidth: 1, borderColor: colors.error }}
+                      >
+                        <Text className="text-xs font-semibold text-error">🗑 Удалить</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Форма редактирования времени */}
+                  {isEditing && (
+                    <View className="px-4 pb-4">
+                      <Text className="text-xs text-muted mb-2">Новое время (ЧЧ:ММ):</Text>
+                      <TextInput
+                        value={editingTime}
+                        onChangeText={setEditingTime}
+                        placeholder="09:00"
+                        keyboardType="numbers-and-punctuation"
+                        returnKeyType="done"
+                        onSubmitEditing={() => handleEditEvent(event.id)}
+                        className="px-3 py-2 rounded-lg border mb-3"
+                        style={{
+                          borderColor: colors.primary,
+                          color: colors.foreground,
+                          backgroundColor: colors.background,
+                        }}
+                        placeholderTextColor={colors.muted}
+                        autoFocus
+                      />
+                      <View className="flex-row gap-2">
+                        <TouchableOpacity
+                          onPress={cancelEdit}
+                          className="flex-1 py-2 rounded-lg items-center bg-surface border"
+                          style={{ borderColor: colors.border }}
+                        >
+                          <Text className="text-xs font-semibold text-foreground">Отмена</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleEditEvent(event.id)}
+                          disabled={isSaving}
+                          className="flex-1 py-2 rounded-lg items-center"
+                          style={{ backgroundColor: colors.primary, opacity: isSaving ? 0.6 : 1 }}
+                        >
+                          <Text className="text-xs font-semibold text-background">
+                            {isSaving ? 'Сохранение...' : 'Сохранить'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
                   )}
                 </View>
-              </TouchableOpacity>
-            ))
+              );
+            })
           )}
 
           {/* Форма добавления события */}
           {isAdding && (
-            <View className="mt-6 p-4 rounded-lg border" style={{ borderColor: colors.primary }}>
+            <View className="mt-4 p-4 rounded-lg border" style={{ borderColor: colors.primary }}>
               <Text className="font-semibold text-foreground mb-4">Добавить событие</Text>
 
               {/* Выбор типа события */}
-              <Text className="text-sm text-muted mb-2">Тип события:</Text>
+              <Text className="text-xs text-muted mb-2">Тип события:</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-                {Object.entries(eventTypeLabels).map(([type, label]) => (
+                {(Object.entries(eventTypeLabels) as [WorkEventType, string][]).map(([type, label]) => (
                   <TouchableOpacity
                     key={type}
-                    onPress={() => setNewEventType(type as WorkEventType)}
-                    className={cn(
-                      'mr-2 px-3 py-2 rounded-full border',
-                      newEventType === type
-                        ? 'bg-primary border-primary'
-                        : 'bg-surface border-border'
-                    )}
+                    onPress={() => setNewEventType(type)}
+                    className="mr-2 px-3 py-2 rounded-full border"
+                    style={{
+                      backgroundColor: newEventType === type ? colors.primary : colors.surface,
+                      borderColor: newEventType === type ? colors.primary : colors.border,
+                    }}
                   >
                     <Text
-                      className={cn(
-                        'text-xs font-semibold',
-                        newEventType === type ? 'text-background' : 'text-foreground'
-                      )}
+                      className="text-xs font-semibold"
+                      style={{ color: newEventType === type ? colors.background : colors.foreground }}
                     >
                       {label}
                     </Text>
@@ -223,15 +401,19 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
               </ScrollView>
 
               {/* Ввод времени */}
-              <Text className="text-sm text-muted mb-2">Время (HH:MM):</Text>
+              <Text className="text-xs text-muted mb-2">Время (ЧЧ:ММ):</Text>
               <TextInput
                 placeholder="09:00"
-                value={editingTime}
-                onChangeText={setEditingTime}
+                value={newEventTime}
+                onChangeText={setNewEventTime}
+                keyboardType="numbers-and-punctuation"
+                returnKeyType="done"
+                onSubmitEditing={handleAddEvent}
                 className="px-3 py-2 rounded-lg border mb-4"
                 style={{
                   borderColor: colors.border,
                   color: colors.foreground,
+                  backgroundColor: colors.surface,
                 }}
                 placeholderTextColor={colors.muted}
               />
@@ -241,34 +423,44 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
                 <TouchableOpacity
                   onPress={() => {
                     setIsAdding(false);
-                    setEditingTime('');
+                    setNewEventTime('');
+                    setValidationErrors([]);
                   }}
-                  className="flex-1 py-2 rounded-lg bg-surface border"
+                  className="flex-1 py-2 rounded-lg items-center bg-surface border"
                   style={{ borderColor: colors.border }}
                 >
-                  <Text className="text-center text-foreground font-semibold">Отмена</Text>
+                  <Text className="text-sm font-semibold text-foreground">Отмена</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleAddEvent}
-                  className="flex-1 py-2 rounded-lg"
-                  style={{ backgroundColor: colors.primary }}
+                  disabled={isSaving}
+                  className="flex-1 py-2 rounded-lg items-center"
+                  style={{ backgroundColor: colors.primary, opacity: isSaving ? 0.6 : 1 }}
                 >
-                  <Text className="text-center text-background font-semibold">Добавить</Text>
+                  <Text className="text-sm font-semibold text-background">
+                    {isSaving ? 'Добавление...' : 'Добавить'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
           )}
+
+          <View style={{ height: 20 }} />
         </ScrollView>
 
         {/* Кнопка добавления события */}
         {!isAdding && (
           <View className="px-4 py-4 border-t" style={{ borderColor: colors.border }}>
             <TouchableOpacity
-              onPress={() => setIsAdding(true)}
-              className="py-3 rounded-lg"
+              onPress={() => {
+                setIsAdding(true);
+                setSelectedEventId(null);
+                setEditingEventId(null);
+              }}
+              className="py-3 rounded-lg items-center"
               style={{ backgroundColor: colors.primary }}
             >
-              <Text className="text-center text-background font-semibold">+ Добавить событие</Text>
+              <Text className="text-background font-semibold">+ Добавить событие</Text>
             </TouchableOpacity>
           </View>
         )}
