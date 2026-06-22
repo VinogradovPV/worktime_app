@@ -318,43 +318,65 @@ export default function CalendarScreen() {
       {/* Содержимое календаря */}
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         {calendarMode === "month" && (
-          <View className="px-4">
+          <View className="px-2">
             {/* День недели */}
-            <View className="flex-row mb-2 mt-4">
+            <View className="flex-row mb-4 mt-4">
               {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((day, index) => (
                 <View key={index} className="flex-1 items-center py-2">
-                  <Text className="text-xs font-semibold text-muted">{day}</Text>
+                  <Text className="text-sm font-bold text-foreground">{day}</Text>
                 </View>
               ))}
             </View>
 
-            {/* Календарь */}
-            <View className="flex-row flex-wrap">
-              {emptyDays.map((_, index) => (
-                <View key={`empty-${index}`} className="w-1/7 aspect-square" />
-              ))}
+            {/* Календарь - распределено по неделям */}
+            {Array.from({ length: Math.ceil((daysInMonth + firstDay) / 7) }).map((_, weekIndex) => {
+              const weekStart = weekIndex * 7;
+              const weekDays = [];
 
-              {days.map((day) => {
-                const dayInfo = getDayType(day);
-                const colors_info = getTypeColor(dayInfo);
+              for (let i = 0; i < 7; i++) {
+                const dayIndex = weekStart + i;
+                if (dayIndex < firstDay) {
+                  // Пустой день до начала месяца
+                  weekDays.push(null);
+                } else if (dayIndex - firstDay < daysInMonth) {
+                  // День месяца
+                  weekDays.push(dayIndex - firstDay + 1);
+                } else {
+                  // Пустой день после конца месяца
+                  weekDays.push(null);
+                }
+              }
 
-                return (
-                  <TouchableOpacity
-                    key={day}
-                    className="w-1/7 aspect-square items-center justify-center rounded-lg mb-1 mx-0.5"
-                    style={{
-                      backgroundColor: colors_info.bg,
-                      borderWidth: 1.5,
-                      borderColor: colors_info.border,
-                    }}
-                    onPress={() => handleDayPress(day)}
-                    onLongPress={() => handleDayLongPress(day)}
-                  >
-                    <Text className="text-sm font-semibold text-foreground">{day}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+              return (
+                <View key={weekIndex} className="flex-row mb-2">
+                  {weekDays.map((day, dayIndex) => {
+                    if (day === null) {
+                      return <View key={`empty-${dayIndex}`} className="flex-1 aspect-square" />;
+                    }
+
+                    const dayInfo = getDayType(day);
+                    const colors_info = getTypeColor(dayInfo);
+
+                    return (
+                      <TouchableOpacity
+                        key={day}
+                        className="flex-1 aspect-square items-center justify-center rounded-lg mx-0.5 mb-0.5"
+                        style={{
+                          backgroundColor: colors_info.bg,
+                          borderWidth: 1.5,
+                          borderColor: colors_info.border,
+                          minHeight: 56,
+                        }}
+                        onPress={() => handleDayPress(day)}
+                        onLongPress={() => handleDayLongPress(day)}
+                      >
+                        <Text className="text-base font-bold text-foreground">{day}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              );
+            })}
           </View>
         )}
 
