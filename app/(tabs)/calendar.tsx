@@ -11,7 +11,7 @@ import { CalendarStatsCards } from "@/components/CalendarStatsCards";
 import { WeekCalendarView } from "@/components/WeekCalendarView";
 import { YearCalendarView } from "@/components/YearCalendarView";
 import { QuarterCalendarView } from "@/components/QuarterCalendarView";
-import { getPeriodStats, getPeriodStart, getPeriodEnd, CalendarStats } from "@/lib/storage/calendarStatsService";
+import { getPeriodStats, getPeriodStart, getPeriodEnd, ReportPeriodStats } from "@/lib/storage/reportStatsService";
 
 type CalendarMode = "month" | "week" | "quarter" | "year";
 
@@ -36,7 +36,7 @@ export default function CalendarScreen() {
   const [selectedDayForDetail, setSelectedDayForDetail] = useState<Date | null>(null);
   const [selectedDayType, setSelectedDayType] = useState<"weekend" | "holiday" | "vacation" | "workday">("workday");
   const [selectedDayVacationType, setSelectedDayVacationType] = useState<"vacation" | "sick_leave" | "unpaid_leave" | undefined>(undefined);
-  const [periodStats, setPeriodStats] = useState<CalendarStats | null>(null);
+  const [periodStats, setPeriodStats] = useState<ReportPeriodStats | null>(null);
 
   useEffect(() => {
     loadCalendarData();

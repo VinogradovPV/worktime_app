@@ -1,7 +1,9 @@
 import { Modal, View, Text, TouchableOpacity, ScrollView } from "react-native";
 import { useColors } from "@/hooks/use-colors";
-import { getWorkSessionsByDate } from "@/lib/storage/workSessionStorage";
+import { getWorkDay } from "@/lib/storage/workdayService";
+import { calculateWorkDayStats, formatTime, formatTimeShort } from "@/lib/storage/workdayStatsService";
 import { useState, useEffect } from "react";
+import { WorkDay } from "@/shared/types/workday";
 
 interface DayDetailModalProps {
   visible: boolean;
@@ -13,11 +15,13 @@ interface DayDetailModalProps {
 
 export function DayDetailModal({ visible, date, dayType, vacationType, onClose }: DayDetailModalProps) {
   const colors = useColors();
+  const [workDay, setWorkDay] = useState<WorkDay | null>(null);
   const [dayStats, setDayStats] = useState({
     totalWorkTime: 0,
     breakTime: 0,
-    sessionsCount: 0,
-    sessions: [] as any[],
+    temporaryExitTime: 0,
+    work95Time: 0,
+    eventsCount: 0,
   });
 
   useEffect(() => {
@@ -31,22 +35,27 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
 
     const dateStr = formatDate(date.getFullYear(), date.getMonth(), date.getDate());
     try {
-      const daySessions = await getWorkSessionsByDate(dateStr);
+      const day = await getWorkDay(dateStr);
+      setWorkDay(day);
 
-      let totalWorkTime = 0;
-      let breakTime = 0;
-
-      daySessions.forEach((session: any) => {
-        totalWorkTime += session.workDuration || 0;
-        breakTime += session.breakDuration || 0;
-      });
-
-      setDayStats({
-        totalWorkTime,
-        breakTime,
-        sessionsCount: daySessions.length,
-        sessions: daySessions,
-      });
+      if (day) {
+        const stats = calculateWorkDayStats(day);
+        setDayStats({
+          totalWorkTime: stats.totalWorkMs,
+          breakTime: stats.totalBreakMs,
+          temporaryExitTime: stats.totalTemporaryExitMs,
+          work95Time: stats.work95Ms,
+          eventsCount: day.events.length,
+        });
+      } else {
+        setDayStats({
+          totalWorkTime: 0,
+          breakTime: 0,
+          temporaryExitTime: 0,
+          work95Time: 0,
+          eventsCount: 0,
+        });
+      }
     } catch (error) {
       console.error("Ошибка при загрузке данных дня:", error);
     }
@@ -56,15 +65,37 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
     return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   };
 
-  const formatTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}ч ${minutes}м`;
-  };
-
-  const formatDateTime = (timestamp: number): string => {
+  const formatDateTime = (timestamp: string): string => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const getEventTypeLabel = (type: string): string => {
+    const typeMap: Record<string, string> = {
+      work_start: "Начало работы",
+      work_end: "Конец работы",
+      break_start: "Начало перерыва",
+      break_end: "Конец перерыва",
+      temporary_exit_start: "Начало выхода",
+      temporary_exit_end: "Конец выхода",
+    };
+    return typeMap[type] || type;
+  };
+
+  const getEventTypeColor = (type: string): string => {
+    switch (type) {
+      case "work_start":
+      case "work_end":
+        return colors.success;
+      case "break_start":
+      case "break_end":
+        return colors.warning;
+      case "temporary_exit_start":
+      case "temporary_exit_end":
+        return "#F97316"; // orange
+      default:
+        return colors.foreground;
+    }
   };
 
   const getDayTypeInfo = () => {
@@ -140,28 +171,41 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
               <View className="flex-row justify-between mb-4">
                 <View className="flex-1 mr-2">
                   <Text className="text-xs text-muted mb-1">Отработано</Text>
-                  <Text className="text-2xl font-bold text-success">{formatTime(dayStats.totalWorkTime)}</Text>
+                  <Text className="text-2xl font-bold text-success">{formatTimeShort(dayStats.totalWorkTime)}</Text>
+                </View>
+                <View className="flex-1 mx-1">
+                  <Text className="text-xs text-muted mb-1">95% норма</Text>
+                  <Text className="text-2xl font-bold text-primary">{formatTimeShort(dayStats.work95Time)}</Text>
                 </View>
                 <View className="flex-1 ml-2">
                   <Text className="text-xs text-muted mb-1">Перерывы</Text>
-                  <Text className="text-2xl font-bold text-warning">{formatTime(dayStats.breakTime)}</Text>
+                  <Text className="text-2xl font-bold text-warning">{formatTimeShort(dayStats.breakTime)}</Text>
                 </View>
               </View>
 
+              {dayStats.temporaryExitTime > 0 && (
+                <View className="mb-4 p-3 rounded-lg" style={{ backgroundColor: colors.background }}>
+                  <Text className="text-xs text-muted mb-1">Временные выходы</Text>
+                  <Text className="text-lg font-bold" style={{ color: "#F97316" }}>
+                    {formatTimeShort(dayStats.temporaryExitTime)}
+                  </Text>
+                </View>
+              )}
+
               <View className="p-3 rounded-lg" style={{ backgroundColor: colors.background }}>
-                <Text className="text-xs text-muted">Рабочих сессий: {dayStats.sessionsCount}</Text>
+                <Text className="text-xs text-muted">Событий: {dayStats.eventsCount}</Text>
               </View>
             </View>
           )}
 
-          {/* Список сессий */}
-          {dayStats.sessions.length > 0 && (
+          {/* Список событий */}
+          {workDay && workDay.events.length > 0 && (
             <View className="mb-6">
-              <Text className="text-sm font-semibold text-foreground mb-3">Рабочие сессии</Text>
+              <Text className="text-sm font-semibold text-foreground mb-3">История событий</Text>
 
-              {dayStats.sessions.map((session, index) => (
+              {workDay.events.map((event, index) => (
                 <View
-                  key={index}
+                  key={event.id}
                   className="mb-3 p-3 rounded-lg border"
                   style={{
                     backgroundColor: colors.surface,
@@ -169,34 +213,22 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
                   }}
                 >
                   <View className="flex-row justify-between items-start mb-2">
-                    <Text className="text-sm font-semibold text-foreground">Сессия {index + 1}</Text>
-                    <Text className="text-xs text-muted">{formatTime(session.workDuration || 0)}</Text>
+                    <View className="flex-1">
+                      <Text className="text-sm font-semibold text-foreground">
+                        {index + 1}. {getEventTypeLabel(event.type)}
+                      </Text>
+                    </View>
+                    <Text className="text-xs text-muted">{formatDateTime(event.timestamp)}</Text>
                   </View>
-
-                  {session.startTime && (
-                    <Text className="text-xs text-muted mb-1">
-                      Начало: {formatDateTime(session.startTime)}
-                    </Text>
-                  )}
-                  {session.endTime && (
-                    <Text className="text-xs text-muted mb-1">
-                      Конец: {formatDateTime(session.endTime)}
-                    </Text>
-                  )}
-                  {(session.breakDuration || 0) > 0 && (
-                    <Text className="text-xs text-muted">
-                      Перерыв: {formatTime(session.breakDuration || 0)}
-                    </Text>
-                  )}
                 </View>
               ))}
             </View>
           )}
 
           {/* Пустое состояние */}
-          {dayStats.sessions.length === 0 && dayType === "workday" && (
+          {workDay && workDay.events.length === 0 && dayType === "workday" && (
             <View className="mb-6 p-4 rounded-lg items-center" style={{ backgroundColor: colors.surface }}>
-              <Text className="text-sm text-muted">Нет данных о рабочих сессиях</Text>
+              <Text className="text-sm text-muted">Нет данных о рабочих событиях</Text>
             </View>
           )}
 
@@ -204,8 +236,8 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
           <View className="mb-6 p-4 rounded-lg" style={{ backgroundColor: colors.surface }}>
             <Text className="text-xs text-muted">
               {dayType === "workday"
-                ? "Здесь отображается информация о рабочих сессиях и времени, проведенном на работе в этот день."
-                : "В этот день рабочие сессии не отслеживаются."}
+                ? "Здесь отображается информация о рабочих событиях и времени, проведенном на работе в этот день."
+                : "В этот день рабочие события не отслеживаются."}
             </Text>
           </View>
         </ScrollView>

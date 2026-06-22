@@ -1,9 +1,9 @@
 import { View, Text, ScrollView } from "react-native";
 import { useColors } from "@/hooks/use-colors";
-import { CalendarStats, formatWorkedTime } from "@/lib/storage/calendarStatsService";
+import { ReportPeriodStats, formatWorkedTime, formatWorkedHours } from "@/lib/storage/reportStatsService";
 
 interface CalendarStatsCardsProps {
-  stats: CalendarStats;
+  stats: ReportPeriodStats;
   mode: "month" | "week" | "quarter" | "year";
 }
 
@@ -53,7 +53,7 @@ export function CalendarStatsCards({ stats, mode }: CalendarStatsCardsProps) {
         }}
       >
         <Text className="text-xs text-muted mb-2">Всего отработано</Text>
-        <Text className="text-3xl font-bold text-success">{formatWorkedTime(stats.workedHours)}</Text>
+        <Text className="text-3xl font-bold text-success">{formatWorkedHours(stats.totalWorkedMs)}</Text>
         <Text className="text-xs text-muted mt-2">
           {stats.workedDays} из {stats.workdaysInCalendar} дней
         </Text>
