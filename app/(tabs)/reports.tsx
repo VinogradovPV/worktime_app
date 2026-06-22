@@ -1,7 +1,12 @@
 import { ScrollView, Text, View, TouchableOpacity, FlatList } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { AnimatedPeriodSelector } from "@/components/AnimatedPeriodSelector";
+import { InteractiveWorkChart } from "@/components/InteractiveWorkChart";
+import { AnimatedStatsGrid, AnimatedStatsCard } from "@/components/AnimatedStatsCard";
+import { AnimatedDetailsList } from "@/components/AnimatedDetailsList";
+import { AnimatedLoadingState } from "@/components/AnimatedLoadingState";
 import { useColors } from "@/hooks/use-colors";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   getPeriodStats,
   getDayStatsForPeriod,
@@ -77,6 +82,11 @@ export default function ReportsScreen() {
     setCurrentDate(new Date());
   };
 
+  const handleDayPress = useCallback((day: ReportDayStats) => {
+    // Обработка нажатия на день графика
+    console.log("Выбран день:", day.date);
+  }, []);
+
   const getPeriodLabel = (): string => {
     const startDate = getPeriodStart(currentDate, selectedPeriod);
     const endDate = getPeriodEnd(currentDate, selectedPeriod);
@@ -140,298 +150,123 @@ export default function ReportsScreen() {
     }
   };
 
+  // Мемоизированные данные для карточек статистики
+  const statsData = useMemo(
+    () => [
+      {
+        label: "Всего отработано",
+        value: periodStats ? formatWorkedHours(periodStats.totalWorkedMs) : "0",
+        unit: "часов",
+        icon: "⏱️",
+        variant: "highlight" as const,
+      },
+      {
+        label: "Среднее в день",
+        value: periodStats ? formatWorkedHours(periodStats.averageWorkedMs) : "0",
+        unit: "часов",
+        icon: "📊",
+      },
+      {
+        label: "95% норма",
+        value: periodStats ? formatWorkedHours(periodStats.totalWork95Ms) : "0",
+        unit: "часов",
+        icon: "✓",
+      },
+      {
+        label: "Перерывы",
+        value: periodStats ? formatWorkedTime(periodStats.totalBreakMs) : "0м",
+        icon: "☕",
+      },
+      {
+        label: "Выходы",
+        value: periodStats ? formatWorkedTime(periodStats.totalTemporaryExitMs) : "0м",
+        icon: "🚪",
+      },
+      {
+        label: "Требуют проверки",
+        value: periodStats?.requiresCheckDays ?? 0,
+        variant:
+          (periodStats?.requiresCheckDays ?? 0) > 0
+            ? ("warning" as const)
+            : ("success" as const),
+        icon: periodStats?.requiresCheckDays ? "⚠️" : "✓",
+      },
+    ],
+    [periodStats]
+  );
+
+  const dayTypeStats = useMemo(
+    () => [
+      {
+        label: "Рабочих дней",
+        value: periodStats?.workedDays ?? 0,
+        unit: `из ${periodStats?.workdaysInCalendar ?? 0}`,
+        icon: "💼",
+      },
+      {
+        label: "Выходные",
+        value: periodStats?.weekends ?? 0,
+        icon: "🏖️",
+      },
+      {
+        label: "Праздники",
+        value: periodStats?.holidays ?? 0,
+        icon: "🎉",
+      },
+      {
+        label: "Отпуск",
+        value: periodStats?.vacationDays ?? 0,
+        icon: "✈️",
+      },
+    ],
+    [periodStats]
+  );
+
   return (
     <ScreenContainer className="p-4">
       <View className="flex-row justify-between items-center mb-6">
         <Text className="text-3xl font-bold text-foreground">Отчеты</Text>
       </View>
 
-      {/* Выбор периода */}
-      <View className="flex-row gap-2 mb-4">
-        {(["day", "week", "month", "year"] as const).map((period) => (
-          <TouchableOpacity
-            key={period}
-            className="px-3 py-2 rounded-full"
-            style={{
-              backgroundColor: selectedPeriod === period ? colors.primary : colors.surface,
-              borderWidth: 1,
-              borderColor: selectedPeriod === period ? colors.primary : colors.border,
-            }}
-            onPress={() => setSelectedPeriod(period)}
-          >
-            <Text
-              className="text-xs font-semibold"
-              style={{ color: selectedPeriod === period ? "#fff" : colors.foreground }}
-            >
-              {period === "day" && "День"}
-              {period === "week" && "Неделя"}
-              {period === "month" && "Месяц"}
-              {period === "year" && "Год"}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Навигация по периодам */}
-      <View className="flex-row justify-between items-center mb-6">
-        <TouchableOpacity
-          className="px-4 py-2 rounded-lg"
-          style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
-          onPress={handlePreviousPeriod}
-        >
-          <Text className="text-foreground font-semibold">←</Text>
-        </TouchableOpacity>
-
-        <Text className="text-sm font-semibold text-foreground text-center flex-1 mx-4">
-          {getPeriodLabel()}
-        </Text>
-
-        <TouchableOpacity
-          className="px-4 py-2 rounded-lg"
-          style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
-          onPress={handleNextPeriod}
-        >
-          <Text className="text-foreground font-semibold">→</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Кнопка "Сегодня" */}
-      <TouchableOpacity
-        className="mb-6 px-4 py-2 rounded-lg self-center"
-        style={{ backgroundColor: colors.primary }}
-        onPress={handleToday}
-      >
-        <Text className="text-white font-semibold text-sm">Сегодня</Text>
-      </TouchableOpacity>
+      {/* Анимированный переключатель периодов */}
+      <AnimatedPeriodSelector
+        mode={selectedPeriod}
+        onModeChange={setSelectedPeriod}
+        periodLabel={getPeriodLabel()}
+        onPrevious={handlePreviousPeriod}
+        onNext={handleNextPeriod}
+        onToday={handleToday}
+      />
 
       {isLoading ? (
-        <View className="flex-1 items-center justify-center">
-          <Text className="text-muted">Загрузка данных...</Text>
+        <View className="flex-1 items-center justify-center mt-8">
+          <AnimatedLoadingState message="Загрузка отчета" />
         </View>
       ) : periodStats ? (
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {/* Основные метрики */}
-          <View className="gap-3 mb-6">
-            {/* Главная карточка - Отработано */}
-            <View
-              className="rounded-lg p-4 border"
-              style={{ backgroundColor: colors.surface, borderColor: colors.border }}
-            >
-              <Text className="text-xs text-muted mb-1">Всего отработано</Text>
-              <Text className="text-3xl font-bold text-foreground">
-                {formatWorkedHours(periodStats.totalWorkedMs)}
+        <ScrollView showsVerticalScrollIndicator={false} className="mt-6">
+          {/* Основные метрики с анимацией */}
+          <AnimatedStatsGrid stats={statsData} isLoading={false} columns={2} />
+
+          {/* Интерактивный график работы */}
+          {dayStats.length > 0 && (
+            <View className="mt-6 rounded-lg p-4" style={{ backgroundColor: colors.surface }}>
+              <Text className="text-sm font-semibold text-foreground mb-4">
+                📊 График работы
               </Text>
-              <Text className="text-xs text-muted mt-1">часов</Text>
+              <InteractiveWorkChart dayStats={dayStats} onDayPress={handleDayPress} />
             </View>
+          )}
 
-            {/* Статистика в 2 колонки */}
-            <View className="flex-row gap-3">
-              <View
-                className="flex-1 rounded-lg p-4 border"
-                style={{ backgroundColor: colors.surface, borderColor: colors.border }}
-              >
-                <Text className="text-xs text-muted mb-1">Среднее в день</Text>
-                <Text className="text-2xl font-bold text-foreground">
-                  {formatWorkedHours(periodStats.averageWorkedMs)}
-                </Text>
-                <Text className="text-xs text-muted mt-1">часов</Text>
-              </View>
-
-              <View
-                className="flex-1 rounded-lg p-4 border"
-                style={{ backgroundColor: colors.surface, borderColor: colors.border }}
-              >
-                <Text className="text-xs text-muted mb-1">95% норма</Text>
-                <Text className="text-2xl font-bold text-foreground">
-                  {formatWorkedHours(periodStats.totalWork95Ms)}
-                </Text>
-                <Text className="text-xs text-muted mt-1">часов</Text>
-              </View>
-            </View>
-
-            {/* Вторая строка статистики */}
-            <View className="flex-row gap-3">
-              <View
-                className="flex-1 rounded-lg p-4 border"
-                style={{ backgroundColor: colors.surface, borderColor: colors.border }}
-              >
-                <Text className="text-xs text-muted mb-1">Перерывы</Text>
-                <Text className="text-2xl font-bold text-foreground">
-                  {formatWorkedTime(periodStats.totalBreakMs)}
-                </Text>
-              </View>
-
-              <View
-                className="flex-1 rounded-lg p-4 border"
-                style={{ backgroundColor: colors.surface, borderColor: colors.border }}
-              >
-                <Text className="text-xs text-muted mb-1">Выходы</Text>
-                <Text className="text-2xl font-bold text-foreground">
-                  {formatWorkedTime(periodStats.totalTemporaryExitMs)}
-                </Text>
-              </View>
-            </View>
-
-            {/* Третья строка статистики */}
-            <View className="flex-row gap-3">
-              <View
-                className="flex-1 rounded-lg p-4 border"
-                style={{ backgroundColor: colors.surface, borderColor: colors.border }}
-              >
-                <Text className="text-xs text-muted mb-1">Рабочих дней</Text>
-                <Text className="text-2xl font-bold text-foreground">{periodStats.workedDays}</Text>
-                <Text className="text-xs text-muted mt-1">
-                  из {periodStats.workdaysInCalendar}
-                </Text>
-              </View>
-
-              <View
-                className="flex-1 rounded-lg p-4 border"
-                style={{ backgroundColor: colors.surface, borderColor: colors.border }}
-              >
-                <Text className="text-xs text-muted mb-1">Требуют проверки</Text>
-                <Text
-                  className="text-2xl font-bold"
-                  style={{ color: periodStats.requiresCheckDays > 0 ? colors.error : colors.success }}
-                >
-                  {periodStats.requiresCheckDays}
-                </Text>
-              </View>
-            </View>
-
-            {/* Четвертая строка статистики */}
-            <View className="flex-row gap-3">
-              <View
-                className="flex-1 rounded-lg p-4 border"
-                style={{ backgroundColor: colors.surface, borderColor: colors.border }}
-              >
-                <Text className="text-xs text-muted mb-1">Выходные</Text>
-                <Text className="text-2xl font-bold text-foreground">{periodStats.weekends}</Text>
-              </View>
-
-              <View
-                className="flex-1 rounded-lg p-4 border"
-                style={{ backgroundColor: colors.surface, borderColor: colors.border }}
-              >
-                <Text className="text-xs text-muted mb-1">Праздники</Text>
-                <Text className="text-2xl font-bold text-foreground">{periodStats.holidays}</Text>
-              </View>
-
-              <View
-                className="flex-1 rounded-lg p-4 border"
-                style={{ backgroundColor: colors.surface, borderColor: colors.border }}
-              >
-                <Text className="text-xs text-muted mb-1">Отпуск</Text>
-                <Text className="text-2xl font-bold text-foreground">{periodStats.vacationDays}</Text>
-              </View>
-            </View>
+          {/* Статистика по типам дней */}
+          <View className="mt-6">
+            <Text className="text-sm font-semibold text-foreground mb-3">
+              📅 По типам дней
+            </Text>
+            <AnimatedStatsGrid stats={dayTypeStats} isLoading={false} columns={2} />
           </View>
 
-          {/* График работы */}
-          {dayStats.length > 0 && (
-            <View
-              className="rounded-lg p-4 border mb-6"
-              style={{ backgroundColor: colors.surface, borderColor: colors.border }}
-            >
-              <Text className="text-sm font-semibold text-foreground mb-4">График работы</Text>
-
-              <View className="flex-row items-end gap-1 h-40">
-                {dayStats.map((item, index) => {
-                  const maxHours = Math.max(
-                    ...dayStats.map((d) => d.workedMs / (1000 * 3600))
-                  );
-                  const hours = item.workedMs / (1000 * 3600);
-                  const height = maxHours > 0 ? (hours / maxHours) * 120 : 0;
-
-                  return (
-                    <View key={index} className="flex-1 items-center">
-                      <View
-                        className="w-full rounded-t"
-                        style={{
-                          height: Math.max(height, 4),
-                          backgroundColor:
-                            item.dayType === "workday" && item.hasData
-                              ? colors.primary
-                              : item.dayType === "weekend"
-                              ? colors.muted
-                              : item.dayType === "holiday"
-                              ? colors.error
-                              : item.dayType === "vacation"
-                              ? colors.primary
-                              : colors.warning,
-                          opacity: item.hasData ? 1 : 0.3,
-                        }}
-                      />
-                      <Text className="text-xs text-muted mt-2">
-                        {new Date(item.date).getDate()}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-
-          {/* Детальная таблица */}
-          {dayStats.length > 0 && (
-            <View
-              className="rounded-lg p-4 border"
-              style={{ backgroundColor: colors.surface, borderColor: colors.border }}
-            >
-              <Text className="text-sm font-semibold text-foreground mb-4">Детали по дням</Text>
-
-              <FlatList
-                data={dayStats}
-                keyExtractor={(item) => item.date}
-                scrollEnabled={false}
-                renderItem={({ item }) => (
-                  <View
-                    className="py-3 border-b"
-                    style={{ borderBottomColor: colors.border }}
-                  >
-                    <View className="flex-row justify-between items-start mb-2">
-                      <View className="flex-1">
-                        <Text className="text-sm font-semibold text-foreground">
-                          {new Date(item.date).toLocaleDateString("ru-RU", {
-                            weekday: "short",
-                            day: "numeric",
-                            month: "short",
-                          })}
-                        </Text>
-                        <Text
-                          className="text-xs mt-1"
-                          style={{ color: getDayTypeColor(item.dayType) }}
-                        >
-                          {getDayTypeLabel(item.dayType)}
-                        </Text>
-                      </View>
-                      <View className="items-end">
-                        <Text className="text-sm font-semibold text-foreground">
-                          {formatWorkedHours(item.workedMs)} ч
-                        </Text>
-                        {item.requiresCheck && (
-                          <Text className="text-xs mt-1" style={{ color: colors.error }}>
-                            ⚠️ Требует проверки
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-
-                    {item.hasData && (
-                      <View className="flex-row gap-4 text-xs">
-                        <Text className="text-xs text-muted">
-                          Перерывы: {formatWorkedTime(item.breakMs)}
-                        </Text>
-                        <Text className="text-xs text-muted">
-                          Выходы: {formatWorkedTime(item.temporaryExitMs)}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                )}
-              />
-            </View>
-          )}
+          {/* Детальная таблица с анимацией */}
+          {dayStats.length > 0 && <AnimatedDetailsList dayStats={dayStats} />}
         </ScrollView>
       ) : null}
     </ScreenContainer>
