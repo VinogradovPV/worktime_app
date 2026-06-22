@@ -321,8 +321,11 @@ export default function CalendarScreen() {
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         {calendarMode === "month" && (
           <View className="px-2">
-            {/* День недели */}
+            {/* День недели с номерами недель */}
             <View className="flex-row mb-4 mt-4">
+              <View className="w-10 items-center py-2">
+                <Text className="text-xs text-muted font-semibold">Нед</Text>
+              </View>
               {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((day, index) => (
                 <View key={index} className="flex-1 items-center py-2">
                   <Text className="text-sm font-bold text-foreground">{day}</Text>
@@ -334,6 +337,9 @@ export default function CalendarScreen() {
             {Array.from({ length: Math.ceil((daysInMonth + firstDay) / 7) }).map((_, weekIndex) => {
               const weekStart = weekIndex * 7;
               const weekDays = [];
+              let weekNumber = 0;
+              let hasCurrentDay = false;
+              const today = new Date();
 
               for (let i = 0; i < 7; i++) {
                 const dayIndex = weekStart + i;
@@ -342,7 +348,17 @@ export default function CalendarScreen() {
                   weekDays.push(null);
                 } else if (dayIndex - firstDay < daysInMonth) {
                   // День месяца
-                  weekDays.push(dayIndex - firstDay + 1);
+                  const day = dayIndex - firstDay + 1;
+                  weekNumber = Math.ceil((day + firstDay) / 7);
+                  
+                  // Проверяем, есть ли в этой неделе сегодняшний день
+                  if (day === today.getDate() && 
+                      currentDate.getMonth() === today.getMonth() && 
+                      currentDate.getFullYear() === today.getFullYear()) {
+                    hasCurrentDay = true;
+                  }
+                  
+                  weekDays.push(day);
                 } else {
                   // Пустой день после конца месяца
                   weekDays.push(null);
@@ -351,7 +367,20 @@ export default function CalendarScreen() {
 
               return (
                 <View key={weekIndex} className="flex-row mb-2">
-                  {weekDays.map((day, dayIndex) => {
+                  {/* Номер недели */}
+                  <View className="w-10 items-center justify-center py-2">
+                    <Text className="text-xs text-muted font-semibold">{weekNumber}</Text>
+                  </View>
+                  
+                  {/* Дни недели с подсветкой текущей недели */}
+                  <View 
+                    className="flex-1 flex-row rounded-lg"
+                    style={{
+                      backgroundColor: hasCurrentDay ? colors.primary + "08" : "transparent",
+                      paddingHorizontal: 4,
+                    }}
+                  >
+                    {weekDays.map((day, dayIndex) => {
                     if (day === null) {
                       return <View key={`empty-${dayIndex}`} className="flex-1 aspect-square" />;
                     }
@@ -359,7 +388,6 @@ export default function CalendarScreen() {
                     const dayInfo = getDayType(day);
                     const colors_info = getTypeColor(dayInfo);
 
-                    const today = new Date();
                     const isToday = day === today.getDate() && 
                                    currentDate.getMonth() === today.getMonth() && 
                                    currentDate.getFullYear() === today.getFullYear();
@@ -386,6 +414,7 @@ export default function CalendarScreen() {
                       </TouchableOpacity>
                     );
                   })}
+                  </View>
                 </View>
               );
             })}
@@ -406,12 +435,15 @@ export default function CalendarScreen() {
         {calendarMode === "quarter" && (
           <QuarterCalendarView
             currentYear={currentDate.getFullYear()}
-            currentQuarter={getCurrentQuarter()}
+            currentQuarter={Math.floor(currentDate.getMonth() / 3) + 1}
             onPreviousQuarter={() => handlePreviousPeriod()}
             onNextQuarter={() => handleNextPeriod()}
             holidays={holidays}
             vacationPeriods={vacationPeriods}
-            onDayPress={handleDayPress}
+            onMonthPress={(month) => {
+              setCurrentDate(new Date(currentDate.getFullYear(), month - 1));
+              setCalendarMode("month");
+            }}
           />
         )}
 
