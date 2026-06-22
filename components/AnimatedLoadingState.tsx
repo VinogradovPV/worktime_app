@@ -20,6 +20,7 @@ export function AnimatedLoadingState({ message = 'Загрузка данных.
   const colors = useColors();
   const dotOpacity = useSharedValue(0.3);
   const spinValue = useSharedValue(0);
+  const slideValue = useSharedValue(0);
 
   useEffect(() => {
     // Анимация мигающих точек
@@ -42,6 +43,16 @@ export function AnimatedLoadingState({ message = 'Загрузка данных.
       -1,
       true
     );
+
+    // Анимация скользящего индикатора
+    slideValue.value = withRepeat(
+      withSequence(
+        withTiming(-128, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
   }, []);
 
   const dotAnimatedStyle = useAnimatedStyle(() => ({
@@ -50,6 +61,10 @@ export function AnimatedLoadingState({ message = 'Загрузка данных.
 
   const spinAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${spinValue.value}deg` }],
+  }));
+
+  const slideAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: slideValue.value }],
   }));
 
   return (
@@ -100,20 +115,7 @@ export function AnimatedLoadingState({ message = 'Загрузка данных.
               height: '100%',
               backgroundColor: colors.primary,
             },
-            {
-              transform: [
-                {
-                  translateX: withRepeat(
-                    withSequence(
-                      withTiming(-128, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-                      withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.ease) })
-                    ),
-                    -1,
-                    true
-                  ),
-                },
-              ],
-            },
+            slideAnimatedStyle,
           ]}
         />
       </View>
