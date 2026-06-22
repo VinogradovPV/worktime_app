@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -7,6 +8,7 @@ import { useState } from "react";
 
 export default function ProfileScreen() {
   const colors = useColors();
+  const router = useRouter();
   const {
     profile,
     structure,
@@ -152,6 +154,22 @@ export default function ProfileScreen() {
           </View>
         </View>
       </View>
+
+      {/* Геолокация и рабочие зоны */}
+      <TouchableOpacity
+        className="p-4 rounded-lg flex-row items-center justify-between"
+        style={{ backgroundColor: colors.surface }}
+        onPress={() => router.push('/geofence-settings' as never)}
+      >
+        <View className="flex-row items-center gap-3">
+          <Text style={{ fontSize: 20 }}>📍</Text>
+          <View>
+            <Text className="text-base font-semibold text-foreground">Геолокация и рабочие зоны</Text>
+            <Text className="text-xs text-muted mt-0.5">Комбинированный режим учёта</Text>
+          </View>
+        </View>
+        <Text className="text-muted text-lg">›</Text>
+      </TouchableOpacity>
 
       {/* Кнопка редактирования */}
       <TouchableOpacity

@@ -10,6 +10,8 @@ import { WorkDayHistory } from '@/components/WorkDayHistory';
 import { RecommendationsSummary } from '@/components/RecommendationsSummary';
 import { WeeklyAnalyticsWidget } from '@/components/WeeklyAnalyticsWidget';
 import { TodayEventsCard } from '@/components/TodayEventsCard';
+import { GeofencePromptModal } from '@/components/GeofencePromptModal';
+import { useGeofence } from '@/hooks/useGeofence';
 import * as Haptics from 'expo-haptics';
 
 export default function HomeScreen() {
@@ -17,6 +19,9 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { workDay, loading, error, stats, availableActions, performAction, refresh } = useWorkDay();
+
+  const workDayStatus = workDay?.status ?? 'not_started';
+  const { pendingPrompt, dismissPrompt } = useGeofence(workDayStatus);
 
   const handleAction = async (action: string) => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -114,6 +119,16 @@ export default function HomeScreen() {
 
         <View style={{ height: 20 }} />
       </ScrollView>
+
+      {/* Геозона: предложение действия при входе/выходе */}
+      <GeofencePromptModal
+        prompt={pendingPrompt}
+        onConfirmStart={() => handleAction('start')}
+        onConfirmReturn={() => handleAction('end_temporary_exit')}
+        onConfirmTempExit={() => handleAction('start_temporary_exit')}
+        onConfirmComplete={() => handleAction('complete')}
+        onDismiss={dismissPrompt}
+      />
     </ScreenContainer>
   );
 }

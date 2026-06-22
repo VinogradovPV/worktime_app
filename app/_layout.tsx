@@ -147,6 +147,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="oauth/callback" />
             <Stack.Screen name="onboarding" />
+            <Stack.Screen name="geofence-settings" options={{ headerShown: false }} />
           </Stack>
           <StatusBar style="auto" />
         </QueryClientProvider>

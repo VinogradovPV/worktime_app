@@ -844,3 +844,16 @@
 - [x] Настройка времени уведомления в настройках (по умолчанию 18:00)
 - [x] Переключатель включения/выключения уведомления о завершении дня
 - [x] Отменять уведомление если день уже завершён (статус completed)
+
+## Фаза 35: Геолокация и геозоны (комбинированный режим)
+
+- [x] Создать модели данных GeofenceZone, GeofenceEvent, GeolocationSettings
+- [x] Создать хранилище geofenceStorage.ts (AsyncStorage)
+- [x] Создать geolocationService.ts (GPS, разрешения, расстояние)
+- [x] Создать geofenceService.ts (создание зон, проверка входа/выхода)
+- [x] Создать useGeofence.ts хук
+- [x] Создать GeofencePromptModal.tsx (bottom sheet с предложениями)
+- [x] Создать экран geofence-settings.tsx (настройки геолокации)
+- [x] Интегрировать GeofencePromptModal в index.tsx
+- [x] Добавить ссылку на геолокацию в profile.tsx
+- [x] Установить expo-location и добавить plugin в app.config.ts

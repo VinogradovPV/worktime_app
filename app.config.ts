@@ -87,6 +87,13 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     [
+      "expo-location",
+      {
+        "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to detect when you arrive at or leave your workplace.",
+        "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to detect when you arrive at or leave your workplace."
+      }
+    ],
+    [
       "expo-audio",
       {
         microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone.",

@@ -43,6 +43,7 @@
     "expo-image-picker": "^16.0.6",
     "expo-keep-awake": "~15.0.8",
     "expo-linking": "~8.0.10",
+    "expo-location": "~19.0.8",
     "expo-network": "^56.0.5",
     "expo-notifications": "~0.32.15",
     "expo-print": "^56.0.4",
