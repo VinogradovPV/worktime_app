@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColors } from '@/hooks/use-colors';
 import { WorkDay, WorkEventType } from '@/shared/types/workday';
 import { WorkDayValidator, ValidationError } from '@/lib/storage/workdayValidationService';
 import { addWorkEvent, rebuildWorkDayFromEvents } from '@/lib/storage/workdayService';
-import { calculateWorkDayStats, formatTimeShort } from '@/lib/storage/workdayStatsService';
+import { calculateWorkDayStats, formatTimeShort, formatTime } from '@/lib/storage/workdayStatsService';
 import { cn } from '@/lib/utils';
 
 interface WorkDayEventEditorProps {
@@ -24,6 +25,8 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
   const [newEventTime, setNewEventTime] = useState<string>('');
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [filterType, setFilterType] = useState<WorkEventType | 'all'>('all');
+  const [copiedEvent, setCopiedEvent] = useState<any>(null);
 
   const eventTypeLabels: Record<WorkEventType, string> = {
     work_start: 'Начало работы',
@@ -292,9 +295,11 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
     return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   };
 
-  const sortedEvents = [...workDay.events].sort((a, b) =>
-    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
+  const sortedEvents = [...workDay.events]
+    .filter(e => filterType === 'all' || e.type === filterType)
+    .sort((a, b) =>
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
 
   const startEditEvent = (eventId: string, currentTimestamp: string) => {
     setEditingEventId(eventId);
@@ -310,6 +315,19 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
     setValidationErrors([]);
   };
 
+  const getLiveStats = () => {
+    const currentWorkDay = rebuildWorkDayFromEvents(workDay);
+    return calculateWorkDayStats(currentWorkDay);
+  };
+
+  React.useEffect(() => {
+    if (visible) {
+      AsyncStorage.getItem('copiedEvent').then(data => {
+        if (data) setCopiedEvent(JSON.parse(data));
+      });
+    }
+  }, [visible]);
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View className="flex-1" style={{ backgroundColor: colors.background }}>
@@ -324,6 +342,78 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
           <Text className="text-xs text-muted mt-1">
             {workDay.date} · {sortedEvents.length} событий
           </Text>
+
+          {(() => {
+            const stats = getLiveStats();
+            return (
+              <View className="mt-3 pt-3 border-t flex-row justify-between" style={{ borderTopColor: colors.border }}>
+                <View>
+                  <Text className="text-xs text-muted">Рабочее время</Text>
+                  <Text className="text-sm font-semibold text-foreground mt-1">
+                    {formatTimeShort(stats.totalWorkMs)}
+                  </Text>
+                </View>
+                <View>
+                  <Text className="text-xs text-muted">Перерывы</Text>
+                  <Text className="text-sm font-semibold text-foreground mt-1">
+                    {formatTimeShort(stats.totalBreakMs)}
+                  </Text>
+                </View>
+                <View>
+                  <Text className="text-xs text-muted">Выходы</Text>
+                  <Text className="text-sm font-semibold text-foreground mt-1">
+                    {formatTimeShort(stats.totalTemporaryExitMs)}
+                  </Text>
+                </View>
+                <View>
+                  <Text className="text-xs text-muted">Норма 95%</Text>
+                  <Text className="text-sm font-semibold text-foreground mt-1">
+                    {formatTimeShort(stats.work95Ms)}
+                  </Text>
+                </View>
+              </View>
+            );
+          })()}
+        </View>
+
+        {/* Фильтр по типу событий */}
+        <View className="px-4 py-3 border-b" style={{ borderBottomColor: colors.border }}>
+          <Text className="text-xs text-muted mb-2">Фильтр по типу:</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+            <TouchableOpacity
+              onPress={() => setFilterType('all')}
+              className="mr-2 px-3 py-2 rounded-full border"
+              style={{
+                backgroundColor: filterType === 'all' ? colors.primary : colors.surface,
+                borderColor: filterType === 'all' ? colors.primary : colors.border,
+              }}
+            >
+              <Text
+                className="text-xs font-semibold"
+                style={{ color: filterType === 'all' ? colors.background : colors.foreground }}
+              >
+                Все
+              </Text>
+            </TouchableOpacity>
+            {(Object.entries(eventTypeLabels) as [WorkEventType, string][]).map(([type, label]) => (
+              <TouchableOpacity
+                key={type}
+                onPress={() => setFilterType(type)}
+                className="mr-2 px-3 py-2 rounded-full border"
+                style={{
+                  backgroundColor: filterType === type ? eventTypeColors[type] : colors.surface,
+                  borderColor: filterType === type ? eventTypeColors[type] : colors.border,
+                }}
+              >
+                <Text
+                  className="text-xs font-semibold"
+                  style={{ color: filterType === type ? colors.background : colors.foreground }}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
 
         {/* Ошибки валидации */}
@@ -399,7 +489,21 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
                         className="flex-1 py-2 rounded-lg items-center"
                         style={{ backgroundColor: colors.primary + '20', borderWidth: 1, borderColor: colors.primary }}
                       >
-                        <Text className="text-xs font-semibold text-primary">✏️ Изменить время</Text>
+                        <Text className="text-xs font-semibold text-primary">✏️ Изменить</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          AsyncStorage.setItem('copiedEvent', JSON.stringify(event));
+                          Alert.alert(
+                            'Копировано',
+                            'Откройте редактор другого дня и нажмите "Приклеить".',
+                            [{ text: 'ОК', style: 'default' }]
+                          );
+                        }}
+                        className="flex-1 py-2 rounded-lg items-center"
+                        style={{ backgroundColor: colors.warning + '20', borderWidth: 1, borderColor: colors.warning }}
+                      >
+                        <Text className="text-xs font-semibold text-warning">📋 Копия</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => handleDeleteEvent(event.id)}
@@ -516,6 +620,39 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
                 >
                   <Text className="text-sm font-semibold text-foreground">Отмена</Text>
                 </TouchableOpacity>
+                {copiedEvent && (
+                  <TouchableOpacity
+                    onPress={async () => {
+                      const newEvent = {
+                        ...copiedEvent,
+                        id: `${Date.now()}-${Math.random()}`,
+                      };
+                      const updatedWorkDay = {
+                        ...workDay,
+                        events: [...workDay.events, newEvent],
+                      };
+                      try {
+                        setIsSaving(true);
+                        await onSave(updatedWorkDay);
+                        setIsAdding(false);
+                        setNewEventTime('');
+                        setValidationErrors([]);
+                        Alert.alert('Успех', 'Событие приклеено');
+                      } catch (error) {
+                        Alert.alert('Ошибка', 'Не удалось приклеить событие');
+                      } finally {
+                        setIsSaving(false);
+                      }
+                    }}
+                    disabled={isSaving}
+                    className="flex-1 py-2 rounded-lg items-center"
+                    style={{ backgroundColor: colors.warning, opacity: isSaving ? 0.6 : 1 }}
+                  >
+                    <Text className="text-sm font-semibold text-background">
+                      {isSaving ? 'Приклеивание...' : '📋 Приклеить'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   onPress={handleAddEvent}
                   disabled={isSaving}
