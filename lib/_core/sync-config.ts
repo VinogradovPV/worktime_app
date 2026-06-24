@@ -105,6 +105,21 @@ export function getSyncConfig(): SyncConfig {
 }
 
 /**
+ * Конфигурация для AdaptiveSyncManager
+ * Оптимизирует потребление батареи через адаптивные интервалы синхронизации
+ */
+export const getAdaptiveSyncConfig = () => ({
+  active_sync_interval_ms: 60000,       // 60 сек при активности
+  idle_sync_interval_ms: 300000,        // 5 мин при неактивности
+  idle_threshold_ms: 300000,            // 5 мин без событий = неактивность
+  night_start_hour: 0,
+  night_end_hour: 6,
+  enable_night_sync: false,             // Отключить ночью
+  enable_event_driven_sync: true,       // Синхронизировать при событиях
+  enable_network_change_sync: true,     // Синхронизировать при восстановлении сети
+});
+
+/**
  * Валидировать конфигурацию
  */
 export function validateSyncConfig(config: SyncConfig): boolean {
