@@ -895,3 +895,10 @@
 - [x] Удалить компонент RecommendationsSummary с главного экрана
 - [x] Обновить тип AnalyticsReportData в analyticsExportService
 - [x] Удалить рекомендации из экспорта аналитики (PDF/CSV)
+
+## Фаза 44: Исправление файлов изображений для сборки APK
+
+- [x] Создать недостающий файл splash-icon.png для splash screen
+- [x] Создать файл icon.png для app launcher
+- [x] Создать файл favicon.png для web
+- [x] Оптимизировать размер всех PNG файлов (512x512 пикселей)
