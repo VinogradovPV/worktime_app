@@ -104,6 +104,69 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleManualSync = async () => {
+    setSyncLoading(true);
+    try {
+      const syncService = getSyncService();
+      if (syncService) {
+        await syncService.sync();
+        Alert.alert('Успешно', 'Синхронизация выполнена');
+        // Обновить информацию
+        const pendingCount = await getPendingEventCount('');
+        setSyncInfo(prev => ({ ...prev, pendingCount }));
+      }
+    } catch (error) {
+      Alert.alert('Ошибка', 'Ошибка синхронизации');
+      console.error('[SettingsScreen] Ошибка синхронизации:', error);
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
+  const formatLastSync = (timestamp: string | null) => {
+    if (!timestamp) return 'Никогда';
+    
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Только что';
+    if (diffMins < 60) return `${diffMins} мин назад`;
+    
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} ч назад`;
+    
+    return date.toLocaleDateString('ru-RU', { 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Загрузить информацию о синхронизации
+  useEffect(() => {
+    const loadSyncInfo = async () => {
+      try {
+        const pendingCount = await getPendingEventCount('');
+        
+        setSyncInfo({
+          lastSyncAt: new Date().toISOString(),
+          pendingCount,
+          isOnline: true,
+          syncMode: 'active',
+        });
+      } catch (error) {
+        console.error('[SettingsScreen] Ошибка загрузки информации о синхронизации:', error);
+      }
+    };
+
+    loadSyncInfo();
+    const interval = setInterval(loadSyncInfo, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <ScreenContainer className="p-4">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
