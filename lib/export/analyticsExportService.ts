@@ -7,14 +7,13 @@ try {
 } catch (e) {
   console.warn('expo-sharing не доступен');
 }
-import { TrendData, WeeklyDistribution, PeriodComparison, Recommendation, formatWorkHours } from '@/lib/services/analyticsService';
+import { TrendData, WeeklyDistribution, PeriodComparison, formatWorkHours } from '@/lib/services/analyticsService';
 
 interface AnalyticsReportData {
   period: string;
   trendData: TrendData[];
   weeklyDistribution: WeeklyDistribution[];
   comparison: PeriodComparison | null;
-  recommendations: Recommendation[];
   generatedAt: string;
 }
 
@@ -25,7 +24,7 @@ function generateAnalyticsHTML(data: AnalyticsReportData): string {
   const trendChartHTML = generateTrendChartHTML(data.trendData);
   const weeklyChartHTML = generateWeeklyChartHTML(data.weeklyDistribution);
   const comparisonChartHTML = data.comparison ? generateComparisonChartHTML(data.comparison) : '';
-  const recommendationsHTML = generateRecommendationsHTML(data.recommendations);
+
 
   return `
     <!DOCTYPE html>
@@ -193,10 +192,7 @@ function generateAnalyticsHTML(data: AnalyticsReportData): string {
         </div>
       ` : ''}
 
-      <div class="section">
-        <div class="section-title">💡 Рекомендации по оптимизации</div>
-        ${recommendationsHTML}
-      </div>
+
 
       <div class="footer">
         <p>Этот отчет был автоматически создан приложением Worktime</p>
@@ -302,26 +298,7 @@ function generateComparisonChartHTML(data: PeriodComparison): string {
   `;
 }
 
-/**
- * Генерирует HTML для рекомендаций
- */
-function generateRecommendationsHTML(data: Recommendation[]): string {
-  if (data.length === 0) {
-    return '<p style="color: #687076;">✨ У вас нет рекомендаций. Ваш рабочий график оптимален!</p>';
-  }
 
-  const recommendationsHTML = data.map(rec => `
-    <div class="recommendation ${rec.priority}">
-      <div class="recommendation-title">${rec.icon} ${rec.title}</div>
-      <div class="recommendation-priority">
-        Приоритет: ${rec.priority === 'high' ? 'Высокий' : rec.priority === 'medium' ? 'Средний' : 'Низкий'}
-      </div>
-      <div class="recommendation-description">${rec.description}</div>
-    </div>
-  `).join('');
-
-  return recommendationsHTML;
-}
 
 /**
  * Экспортирует аналитику в PDF

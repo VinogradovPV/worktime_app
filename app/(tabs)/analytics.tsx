@@ -14,18 +14,16 @@ import { WeeklyDistributionChart } from '@/components/charts/WeeklyDistributionC
 import { ComparisonChart } from '@/components/charts/ComparisonChart';
 import { HeatmapChart } from '@/components/charts/HeatmapChart';
 import { HourlyActivityChart } from '@/components/charts/HourlyActivityChart';
-import { RecommendationCard } from '@/components/RecommendationCard';
+
 import { ExportOptionsModal } from '@/components/ExportOptionsModal';
 import {
   calculateTrend,
   comparePeriods,
   calculateWeeklyDistribution,
   calculateHourlyActivity,
-  generateRecommendations,
   TrendData,
   WeeklyDistribution,
   PeriodComparison,
-  Recommendation,
   HourlyActivity,
 } from '@/lib/services/analyticsService';
 import {
@@ -37,21 +35,15 @@ import { exportAnalyticsToPDF, exportAnalyticsToCSV } from '@/lib/export/analyti
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams } from 'expo-router';
 
-type AnalyticsTab = 'trends' | 'distribution' | 'comparison' | 'heatmap' | 'recommendations';
+type AnalyticsTab = 'trends' | 'distribution' | 'comparison' | 'heatmap';
 
 export default function AnalyticsScreen() {
   const colors = useColors();
   const { section } = useLocalSearchParams<{ section?: string }>();
-  const [activeTab, setActiveTab] = useState<AnalyticsTab>(
-    section === 'recommendations' ? 'recommendations' : 'trends'
-  );
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>('trends');
 
   // Обновить вкладку при изменении параметра section (навигация из главного экрана)
-  useEffect(() => {
-    if (section === 'recommendations') {
-      setActiveTab('recommendations');
-    }
-  }, [section]);
+
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -60,7 +52,7 @@ export default function AnalyticsScreen() {
   const [trendData, setTrendData] = useState<TrendData[]>([]);
   const [weeklyDist, setWeeklyDist] = useState<WeeklyDistribution[]>([]);
   const [comparison, setComparison] = useState<PeriodComparison | null>(null);
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+
   const [hourlyActivity, setHourlyActivity] = useState<HourlyActivity[]>([]);
   const [showExportModal, setShowExportModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -115,14 +107,11 @@ export default function AnalyticsScreen() {
       const trend = calculateTrend(currentWorkDays);
       const weekly = calculateWeeklyDistribution(currentWorkDays);
       const comp = comparePeriods(prevWorkDays, currentWorkDays);
-      const recs = generateRecommendations(currentWorkDays, weekly, trend);
-
       const hourly = calculateHourlyActivity(currentWorkDays);
 
       setTrendData(trend);
       setWeeklyDist(weekly);
       setComparison(comp);
-      setRecommendations(recs);
       setHourlyActivity(hourly);
     } catch (error) {
       console.error('Ошибка при загрузке аналитики:', error);
@@ -198,7 +187,6 @@ export default function AnalyticsScreen() {
         trendData,
         weeklyDistribution: weeklyDist,
         comparison,
-        recommendations,
         generatedAt: new Date().toLocaleString('ru-RU'),
       };
       if (format === 'pdf') {
@@ -212,7 +200,7 @@ export default function AnalyticsScreen() {
     } finally {
       setIsExporting(false);
     }
-  }, [trendData, weeklyDist, comparison, recommendations, getPeriodLabel]);
+  }, [trendData, weeklyDist, comparison, getPeriodLabel]);
 
   return (
     <ScreenContainer className="p-4">
@@ -362,7 +350,6 @@ export default function AnalyticsScreen() {
           { id: 'distribution' as const, label: 'Распределение' },
           { id: 'comparison' as const, label: 'Сравнение' },
           { id: 'heatmap' as const, label: 'Тепловая карта' },
-          { id: 'recommendations' as const, label: 'Советы' },
         ].map((tab) => (
           <Pressable
             key={tab.id}
@@ -432,47 +419,7 @@ export default function AnalyticsScreen() {
             </View>
           )}
 
-          {activeTab === 'recommendations' && (
-            <View>
-              {recommendations.length > 0 ? (
-                <View>
-                  {recommendations.map((rec) => (
-                    <RecommendationCard key={rec.id} recommendation={rec} />
-                  ))}
-                </View>
-              ) : (
-                <View
-                  style={{
-                    backgroundColor: colors.surface,
-                    borderRadius: 12,
-                    padding: 24,
-                    alignItems: 'center',
-                  }}
-                >
-                  <Text style={{ fontSize: 32, marginBottom: 8 }}>✨</Text>
-                  <Text
-                    style={{
-                      fontSize: 14,
-                      fontWeight: '600',
-                      color: colors.foreground,
-                      marginBottom: 4,
-                    }}
-                  >
-                    Отлично!
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: colors.muted,
-                      textAlign: 'center',
-                    }}
-                  >
-                    У вас нет рекомендаций. Ваш рабочий график оптимален!
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
+
 
           <View style={{ height: 20 }} />
         </ScrollView>

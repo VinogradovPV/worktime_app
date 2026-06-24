@@ -886,3 +886,12 @@
 ## Фаза 42: Исправление сборки APK
 
 - [x] Создать недостающий файл android-icon-foreground.png для адаптивной иконки Android
+
+## Фаза 43: Удаление функции рекомендаций
+
+- [x] Удалить вкладку "Советы" (Recommendations) из экрана аналитики
+- [x] Удалить компонент RecommendationCard
+- [x] Удалить функцию generateRecommendations из analyticsService
+- [x] Удалить компонент RecommendationsSummary с главного экрана
+- [x] Обновить тип AnalyticsReportData в analyticsExportService
+- [x] Удалить рекомендации из экспорта аналитики (PDF/CSV)

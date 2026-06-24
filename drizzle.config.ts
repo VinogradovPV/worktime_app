@@ -16,6 +16,6 @@ export default defineConfig({
     user,
     password,
     database,
-    ssl: false,
+    ssl: { rejectUnauthorized: false }, // Required for self-signed certificate on Yandex Cloud
   },
 });
