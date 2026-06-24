@@ -15,6 +15,8 @@ import {
 } from '@/lib/storage/workdayStateMachine';
 import { calculateWorkDayStats } from '@/lib/storage/workdayStatsService';
 import { formatDate } from '@/lib/utils/dateUtils';
+import { getSyncService } from '@/lib/services/sync-service';
+import { getAdaptiveSyncManager } from '@/lib/services/adaptive-sync-manager';
 
 interface UseWorkDayReturn {
   workDay: WorkDay | null;
@@ -175,6 +177,23 @@ export function useWorkDay(): UseWorkDayReturn {
         const updated = performAction(workDay, action);
         await saveWorkDay(updated);
         setWorkDay(updated);
+
+        // Event-driven синхронизация: записать событие и запустить синхронизацию
+        try {
+          const adaptiveManager = getAdaptiveSyncManager();
+          const syncService = getSyncService();
+          
+          if (adaptiveManager && syncService) {
+            // Записать событие в адаптивный менеджер
+            adaptiveManager.recordEvent();
+
+            // Выполнить синхронизацию (event-driven)
+            // syncService.sync() будет вызван автоматически в recordEvent()
+          }
+        } catch (syncError) {
+          console.warn('[useWorkDay] Ошибка синхронизации:', syncError);
+          // Не прерываем основной поток, синхронизация — вторичная операция
+        }
       } catch (err) {
         const message =
           err instanceof StateTransitionError
