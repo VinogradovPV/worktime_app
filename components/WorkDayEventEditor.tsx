@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColors } from '@/hooks/use-colors';
 import { WorkDay, WorkEventType } from '@/shared/types/workday';
@@ -330,7 +331,7 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1" style={{ backgroundColor: colors.background }}>
+      <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
         {/* Заголовок */}
         <View className="px-4 py-4 border-b" style={{ borderColor: colors.border }}>
           <View className="flex-row justify-between items-center">
@@ -686,7 +687,7 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
             </TouchableOpacity>
           </View>
         )}
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
