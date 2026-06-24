@@ -97,7 +97,7 @@ export const translations = {
     },
     // Common
     common: {
-      loading: 'Загружка...',
+      loading: 'Загрузка...',
       error: 'Ошибка',
       success: 'Успешно',
       cancel: 'Отмена',
@@ -113,121 +113,7 @@ export const translations = {
       thisYear: 'Этот год',
     },
   },
-  en: {
-    // Home screen
-    home: {
-      title: 'Worktime',
-      status: 'Status',
-      worked: 'Worked',
-      breaks: 'Breaks',
-      exits: 'Exits',
-      percent95: '95% time',
-      breakTime: 'Break',
-      temporaryExit: 'Temporary Exit',
-    },
-    // Calendar screen
-    calendar: {
-      title: 'Calendar',
-      selectDate: 'Select date',
-      noData: 'No data',
-      workingTime: 'Working time',
-    },
-    // Reports screen
-    reports: {
-      title: 'Reports',
-      weekly: 'Weekly',
-      monthly: 'Monthly',
-      export: 'Export',
-      exportPDF: 'Export to PDF',
-      exportCSV: 'Export to CSV',
-      share: 'Share',
-    },
-    // Analytics screen
-    analytics: {
-      title: 'Analytics',
-      trends: 'Trends',
-      distribution: 'Distribution',
-      comparison: 'Comparison',
-      recommendations: 'Recommendations',
-      averageWorkTime: 'Average work time',
-      peakHours: 'Peak hours',
-      workTrend: 'Work trend',
-    },
-    // Settings screen
-    settings: {
-      title: 'Settings',
-      language: 'Language',
-      theme: 'Theme',
-      light: 'Light',
-      dark: 'Dark',
-      auto: 'Automatic',
-      notifications: 'Notifications',
-      logout: 'Logout',
-    },
-    // Sync
-    sync: {
-      title: 'Synchronization',
-      status: 'Status',
-      lastSync: 'Last synchronization',
-      pendingEvents: 'Pending events',
-      syncMode: 'Synchronization mode',
-      apiConnection: 'API connection',
-      connected: 'Connected',
-      disconnected: 'Disconnected',
-      syncNow: 'Synchronize now',
-      syncing: 'Synchronizing...',
-      synced: 'Synchronized',
-      pending: 'Pending synchronization',
-      error: 'Synchronization error',
-      requiresReview: 'Requires review',
-      never: 'Never',
-      justNow: 'Just now',
-      minutesAgo: '{{count}} min ago',
-      hoursAgo: '{{count}} h ago',
-      activeMode: 'Active',
-      idleMode: 'Idle',
-      nightMode: 'Night',
-      offlineMode: 'Offline',
-      successMessage: 'Synchronization completed',
-      errorMessage: 'Synchronization error',
-    },
-    // Conflicts
-    conflicts: {
-      title: 'Synchronization conflicts',
-      description: 'Conflicts detected during synchronization. Choose resolution method:',
-      noConflicts: 'No conflicts found',
-      conflictCount: 'Conflicts: {{count}}',
-      resolveAll: 'Resolve all',
-      useLocal: 'Use local data',
-      useServer: 'Use server data',
-      recalculate: 'Recalculate work day',
-      conflictDetails: 'Conflict details',
-      localData: 'Local data',
-      serverData: 'Server data',
-      timestamp: 'Time',
-      workTime: 'Work time',
-      breaks: 'Breaks',
-      exits: 'Exits',
-    },
-    // Common
-    common: {
-      loading: 'Loading...',
-      error: 'Error',
-      success: 'Success',
-      cancel: 'Cancel',
-      save: 'Save',
-      delete: 'Delete',
-      edit: 'Edit',
-      close: 'Close',
-      back: 'Back',
-      next: 'Next',
-      previous: 'Previous',
-      today: 'Today',
-      thisMonth: 'This month',
-      thisYear: 'This year',
-    },
-  },
-};
+} as const;
 
-export type Language = 'ru' | 'en';
+export type Language = 'ru';
 export type Translations = typeof translations;

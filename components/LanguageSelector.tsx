@@ -10,7 +10,6 @@ export function LanguageSelector() {
 
   const languages = [
     { code: 'ru', name: 'Русский', flag: '🇷🇺' },
-    { code: 'en', name: 'English', flag: '🇬🇧' },
   ];
 
   return (
@@ -20,7 +19,7 @@ export function LanguageSelector() {
         {languages.map((lang) => (
           <Pressable
             key={lang.code}
-            onPress={() => setLanguage(lang.code as 'ru' | 'en')}
+            onPress={() => setLanguage(lang.code as 'ru')}
             style={({ pressed }) => ({
               opacity: pressed ? 0.7 : 1,
             })}
