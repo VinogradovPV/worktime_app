@@ -8,6 +8,7 @@ import { View, Text, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { SyncStatus, SyncStatusInfo } from '@/shared/types/sync';
 import { useColors } from '@/hooks/use-colors';
+import { useI18n } from '@/hooks/useI18n';
 import { cn } from '@/lib/utils';
 
 interface SyncStatusBadgeProps {
@@ -23,11 +24,11 @@ interface SyncStatusBadgeProps {
 /**
  * Получить информацию о статусе синхронизации
  */
-function getSyncStatusInfo(status: SyncStatus): SyncStatusInfo {
+function getSyncStatusInfo(status: SyncStatus, t: (key: string) => string): SyncStatusInfo {
   const statusMap: Record<SyncStatus, SyncStatusInfo> = {
     pending_sync: {
       status: 'pending_sync',
-      message: 'Ожидание синхронизации',
+      message: t('sync.pending'),
       icon: 'clock',
       color: '#F59E0B',
       is_syncing: false,
@@ -36,7 +37,7 @@ function getSyncStatusInfo(status: SyncStatus): SyncStatusInfo {
     },
     synced: {
       status: 'synced',
-      message: 'Синхронизировано',
+      message: t('sync.synced'),
       icon: 'check',
       color: '#22C55E',
       is_syncing: false,
@@ -45,7 +46,7 @@ function getSyncStatusInfo(status: SyncStatus): SyncStatusInfo {
     },
     error: {
       status: 'error',
-      message: 'Ошибка синхронизации',
+      message: t('sync.error'),
       icon: 'error',
       color: '#EF4444',
       is_syncing: false,
@@ -54,7 +55,7 @@ function getSyncStatusInfo(status: SyncStatus): SyncStatusInfo {
     },
     requires_review: {
       status: 'requires_review',
-      message: 'Требуется проверка',
+      message: t('sync.requiresReview'),
       icon: 'alert',
       color: '#F59E0B',
       is_syncing: false,
@@ -63,7 +64,7 @@ function getSyncStatusInfo(status: SyncStatus): SyncStatusInfo {
     },
     conflict: {
       status: 'conflict',
-      message: 'Конфликт данных',
+      message: t('conflicts.title'),
       icon: 'alert',
       color: '#F59E0B',
       is_syncing: false,
@@ -135,7 +136,8 @@ export function SyncStatusBadge({
   showTimestamp = false,
 }: SyncStatusBadgeProps) {
   const colors = useColors();
-  const statusInfo = getSyncStatusInfo(status);
+  const { t } = useI18n();
+  const statusInfo = getSyncStatusInfo(status, t);
   const iconName = getStatusIcon(statusInfo.icon);
 
   const sizeMap = {
@@ -216,7 +218,8 @@ export function SyncStatusIcon({
   status: SyncStatus;
   size?: number;
 }) {
-  const statusInfo = getSyncStatusInfo(status);
+  const { t } = useI18n();
+  const statusInfo = getSyncStatusInfo(status, t);
   const iconName = getStatusIcon(statusInfo.icon);
 
   return status === 'pending_sync' ? (
@@ -245,7 +248,8 @@ export function SyncStatusDetails({
   last_sync_at?: string;
 }) {
   const colors = useColors();
-  const statusInfo = getSyncStatusInfo(status);
+  const { t } = useI18n();
+  const statusInfo = getSyncStatusInfo(status, t);
 
   return (
     <View className="gap-2 rounded-lg bg-surface p-4">
