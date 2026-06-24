@@ -23,7 +23,7 @@ export function I18nProvider({ children }: I18nProviderProps) {
     const loadLanguage = async () => {
       try {
         const savedLanguage = await AsyncStorage.getItem('appLanguage');
-        if (savedLanguage === 'en' || savedLanguage === 'ru') {
+        if (savedLanguage === 'ru') {
           setLanguageState(savedLanguage);
         }
       } catch (error) {
