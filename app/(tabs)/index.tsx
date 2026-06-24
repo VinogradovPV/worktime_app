@@ -13,6 +13,8 @@ import { TodayEventsCard } from '@/components/TodayEventsCard';
 import { GeofencePromptModal } from '@/components/GeofencePromptModal';
 import { useGeofence } from '@/hooks/useGeofence';
 import * as Haptics from 'expo-haptics';
+import { SyncConflictHandler, useSyncConflictHandler } from '@/components/sync-conflict-handler';
+import { useEffect } from 'react';
 
 export default function HomeScreen() {
   const colors = useColors();
@@ -22,6 +24,20 @@ export default function HomeScreen() {
 
   const workDayStatus = workDay?.status ?? 'not_started';
   const { pendingPrompt, dismissPrompt } = useGeofence(workDayStatus);
+  const { visible, conflicts, setVisible, checkConflicts, resolveConflict } = useSyncConflictHandler();
+
+  // Проверить конфликты при загрузке экрана
+  useEffect(() => {
+    const checkForConflicts = async () => {
+      try {
+        await checkConflicts('default_user');
+      } catch (error) {
+        console.error('[HomeScreen] Ошибка проверки конфликтов:', error);
+      }
+    };
+
+    checkForConflicts();
+  }, [checkConflicts]);
 
   const handleAction = async (action: string) => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -128,6 +144,14 @@ export default function HomeScreen() {
         onConfirmTempExit={() => handleAction('start_temporary_exit')}
         onConfirmComplete={() => handleAction('complete')}
         onDismiss={dismissPrompt}
+      />
+
+      {/* Обработчик конфликтов синхронизации */}
+      <SyncConflictHandler
+        visible={visible}
+        conflicts={conflicts}
+        onResolve={resolveConflict}
+        onClose={() => setVisible(false)}
       />
     </ScreenContainer>
   );

@@ -12,6 +12,7 @@ import { WeekCalendarView } from "@/components/WeekCalendarView";
 import { YearCalendarView } from "@/components/YearCalendarView";
 import { QuarterCalendarView } from "@/components/QuarterCalendarView";
 import { getPeriodStats, getPeriodStart, getPeriodEnd, ReportPeriodStats } from "@/lib/storage/reportStatsService";
+import { SyncConflictHandler, useSyncConflictHandler } from "@/components/sync-conflict-handler";
 
 type CalendarMode = "month" | "week" | "quarter" | "year";
 
@@ -37,11 +38,21 @@ export default function CalendarScreen() {
   const [selectedDayType, setSelectedDayType] = useState<"weekend" | "holiday" | "vacation" | "workday">("workday");
   const [selectedDayVacationType, setSelectedDayVacationType] = useState<"vacation" | "sick_leave" | "unpaid_leave" | undefined>(undefined);
   const [periodStats, setPeriodStats] = useState<ReportPeriodStats | null>(null);
+  const { visible, conflicts, setVisible, checkConflicts, resolveConflict } = useSyncConflictHandler();
 
   useEffect(() => {
     loadCalendarData();
     loadPeriodStats();
+    checkForConflicts();
   }, [currentDate, calendarMode]);
+
+  const checkForConflicts = async () => {
+    try {
+      await checkConflicts('default_user');
+    } catch (error) {
+      console.error('[CalendarScreen] Ошибка проверки конфликтов:', error);
+    }
+  };
 
   const loadCalendarData = async () => {
     try {
@@ -570,6 +581,14 @@ export default function CalendarScreen() {
           setDayDetailVisible(false);
           setSelectedDayForDetail(null);
         }}
+      />
+
+      {/* Обработчик конфликтов синхронизации */}
+      <SyncConflictHandler
+        visible={visible}
+        conflicts={conflicts}
+        onResolve={resolveConflict}
+        onClose={() => setVisible(false)}
       />
     </ScreenContainer>
   );
