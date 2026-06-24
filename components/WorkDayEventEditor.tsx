@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, Alert, Animated, PanResponder } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColors } from '@/hooks/use-colors';
@@ -18,6 +18,30 @@ interface WorkDayEventEditorProps {
 
 export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDayEventEditorProps) {
   const colors = useColors();
+  const panY = useRef(new Animated.Value(0)).current;
+  
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (evt, { dy }) => Math.abs(dy) > 5,
+      onPanResponderMove: (evt, { dy }) => {
+        if (dy > 0) {
+          panY.setValue(dy);
+        }
+      },
+      onPanResponderRelease: (evt, { dy, vy }) => {
+        if (dy > 80 || vy > 0.5) {
+          onClose();
+        } else {
+          Animated.spring(panY, {
+            toValue: 0,
+            useNativeDriver: false,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [editingTime, setEditingTime] = useState<string>('');
@@ -329,9 +353,14 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
     }
   }, [visible]);
 
+  const animatedStyle = {
+    transform: [{ translateY: panY }],
+  };
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
+      <Animated.View style={[{ flex: 1 }, animatedStyle]} {...panResponder.panHandlers}>
+        <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
         {/* Заголовок */}
         <View className="px-4 py-4 border-b" style={{ borderColor: colors.border }}>
           <View className="flex-row justify-between items-center">
@@ -687,7 +716,8 @@ export function WorkDayEventEditor({ visible, workDay, onClose, onSave }: WorkDa
             </TouchableOpacity>
           </View>
         )}
-      </SafeAreaView>
+        </SafeAreaView>
+      </Animated.View>
     </Modal>
   );
 }
