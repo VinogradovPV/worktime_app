@@ -1,4 +1,4 @@
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
@@ -14,7 +14,8 @@ import { GeofencePromptModal } from '@/components/GeofencePromptModal';
 import { useGeofence } from '@/hooks/useGeofence';
 import * as Haptics from 'expo-haptics';
 import { SyncConflictHandler, useSyncConflictHandler } from '@/components/sync-conflict-handler';
-import { useEffect } from 'react';
+import { SyncStatusBadge } from '@/components/sync-status-badge';
+import { useEffect, useState } from 'react';
 
 export default function HomeScreen() {
   const colors = useColors();
@@ -39,12 +40,27 @@ export default function HomeScreen() {
     checkForConflicts();
   }, [checkConflicts]);
 
+  const [refreshing, setRefreshing] = useState(false);
+
   const handleAction = async (action: string) => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await performAction(action);
     } catch (err) {
       console.error('Error performing action:', err);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refresh();
+      // Также проверить конфликты при refresh
+      await checkConflicts('default_user');
+    } catch (error) {
+      console.error('[HomeScreen] Ошибка при refresh:', error);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -56,19 +72,29 @@ export default function HomeScreen() {
           paddingBottom: 88 + insets.bottom,
         }} 
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+          />
+        }
       >
         {/* Заголовок */}
         <View className="flex-row justify-between items-center mb-6" style={{ marginTop: insets.top + 8 }}>
-          <View>
+          <View className="flex-1">
             <Text className="text-3xl font-bold text-foreground mt-2">{t('home.title')}</Text>
-            <Text className="text-sm text-muted mt-1">
-              {new Date().toLocaleDateString('ru-RU', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              })}
-            </Text>
+            <View className="flex-row items-center mt-1 gap-2">
+              <Text className="text-sm text-muted">
+                {new Date().toLocaleDateString('ru-RU', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </Text>
+              <SyncStatusBadge status="synced" size="small" showText={false} />
+            </View>
           </View>
           <View
             className="w-12 h-12 rounded-full items-center justify-center"

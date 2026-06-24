@@ -7,9 +7,16 @@ import { LanguageSelector } from "@/components/LanguageSelector";
 import { ThemeSelector } from "@/components/ThemeSelector";
 import { useState, useEffect } from "react";
 import * as Haptics from "expo-haptics";
+import { getSyncService } from "@/lib/services/sync-service";
+import { getAdaptiveSyncManager } from "@/lib/services/adaptive-sync-manager";
+import { getPendingEventCount } from "@/lib/services/sync-storage";
+import { SyncStatusBadge } from "@/components/sync-status-badge";
+import { MaterialIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function SettingsScreen() {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { settings, vacationPeriods, updateSettings, addVacation, removeVacation } = useNotifications();
   const [morningTime, setMorningTime] = useState("09:30");
@@ -21,6 +28,13 @@ export default function SettingsScreen() {
   const [vacationStartDate, setVacationStartDate] = useState("");
   const [vacationEndDate, setVacationEndDate] = useState("");
   const [vacationType, setVacationType] = useState<"vacation" | "sick_leave" | "unpaid_leave">("vacation");
+  const [syncInfo, setSyncInfo] = useState({
+    lastSyncAt: null as string | null,
+    pendingCount: 0,
+    isOnline: true,
+    syncMode: 'active' as 'active' | 'idle' | 'night' | 'offline',
+  });
+  const [syncLoading, setSyncLoading] = useState(false);
 
   useEffect(() => {
     if (settings) {
