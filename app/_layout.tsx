@@ -25,6 +25,8 @@ import { syncService } from "@/lib/sync/syncService";
 import { autoSyncService } from "@/lib/sync/autoSyncService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
+import { initializeAdaptiveSyncManager, shutdownAdaptiveSyncManager } from "@/lib/services/adaptive-sync-manager";
+import { getAdaptiveSyncConfig } from "@/lib/_core/sync-config";
 
 const ONBOARDING_KEY = "onboarding_completed";
 
@@ -81,6 +83,16 @@ export default function RootLayout() {
         syncOnWifiOnly: false,
         syncInterval: 5 * 60 * 1000, // 5 minutes
       });
+
+      // Initialize AdaptiveSyncManager for battery optimization
+      try {
+        const userId = await AsyncStorage.getItem('user_id') || 'default_user';
+        const config = getAdaptiveSyncConfig();
+        await initializeAdaptiveSyncManager(userId, config);
+        console.log('[App] AdaptiveSyncManager initialized');
+      } catch (error) {
+        console.error('[App] Error initializing AdaptiveSyncManager:', error);
+      }
     };
 
     initSync().catch((error) => {
@@ -89,6 +101,7 @@ export default function RootLayout() {
 
     return () => {
       autoSyncService.stop();
+      shutdownAdaptiveSyncManager().catch(console.error);
     };
   }, []);
 
