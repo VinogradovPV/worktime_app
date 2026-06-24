@@ -952,3 +952,15 @@
 - [x] Создать SYNC_IMPLEMENTATION.md с описанием реализации
 - [x] Добавить примеры использования syncService
 - [x] Добавить troubleshooting guide
+
+
+## Фаза 46: Интеграция AdaptiveSyncManager и обработка конфликтов
+
+- [x] Интегрировать AdaptiveSyncManager в app/_layout.tsx
+- [x] Создать компонент SyncConflictHandler для разрешения конфликтов
+- [x] Добавить hook useSyncConflictHandler для управления конфликтами
+- [ ] Интегрировать SyncConflictHandler в основные экраны (Home, Calendar, DayDetails)
+- [ ] Вызывать recordSyncEvent() при создании новых событий
+- [ ] Настроить environment переменные EXPO_PUBLIC_API_BASE_URL и EXPO_PUBLIC_API_TOKEN (ОТЛОЖЕНО)
+- [ ] Добавить обработку конфликтов в SyncService
+- [ ] Создать API endpoint для разрешения конфликтов на сервере
