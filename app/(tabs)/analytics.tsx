@@ -8,7 +8,7 @@ import {
   Alert,
 } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
-import { useColors } from '@/hooks/use-colors';
+import { useAppTheme } from '@/hooks/useAppTheme';
 import { TrendChart } from '@/components/charts/TrendChart';
 import { WeeklyDistributionChart } from '@/components/charts/WeeklyDistributionChart';
 import { ComparisonChart } from '@/components/charts/ComparisonChart';
@@ -38,7 +38,7 @@ import { useLocalSearchParams } from 'expo-router';
 type AnalyticsTab = 'trends' | 'distribution' | 'comparison' | 'heatmap';
 
 export default function AnalyticsScreen() {
-  const colors = useColors();
+  const theme = useAppTheme();
   const { section } = useLocalSearchParams<{ section?: string }>();
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('trends');
 
@@ -211,13 +211,13 @@ export default function AnalyticsScreen() {
             style={{
               fontSize: 28,
               fontWeight: 'bold',
-              color: colors.foreground,
+              color: theme.colors.textPrimary,
               marginBottom: 4,
             }}
           >
             📊 Аналитика
           </Text>
-          <Text style={{ fontSize: 13, color: colors.muted }}>
+          <Text style={{ fontSize: 13, color: theme.colors.textMuted }}>
             Анализ тенденций и рекомендации по оптимизации
           </Text>
         </View>
@@ -230,7 +230,7 @@ export default function AnalyticsScreen() {
             style={{
               padding: 8,
               borderRadius: 8,
-              backgroundColor: colors.primary,
+              backgroundColor: theme.colors.accent,
             }}
           >
             <Text style={{ fontSize: 16 }}>📥</Text>
@@ -249,7 +249,7 @@ export default function AnalyticsScreen() {
       {/* Выбор периода */}
       <View
         style={{
-          backgroundColor: colors.surface,
+          backgroundColor: theme.colors.surface,
           borderRadius: 12,
           padding: 12,
           marginBottom: 16,
@@ -274,7 +274,7 @@ export default function AnalyticsScreen() {
                   paddingHorizontal: 12,
                   borderRadius: 8,
                   backgroundColor:
-                    selectedPeriod === period ? colors.primary : colors.background,
+                    selectedPeriod === period ? theme.colors.accent : theme.colors.background,
                   opacity: pressed ? 0.7 : 1,
                 },
               ]}
@@ -285,7 +285,7 @@ export default function AnalyticsScreen() {
                   fontSize: 12,
                   fontWeight: '600',
                   color:
-                    selectedPeriod === period ? colors.background : colors.foreground,
+                    selectedPeriod === period ? theme.colors.textInverse : theme.colors.textPrimary,
                 }}
               >
                 {period === 'week' ? 'Неделя' : period === 'month' ? 'Месяц' : 'Год'}
@@ -306,7 +306,7 @@ export default function AnalyticsScreen() {
             onPress={handlePreviousPeriod}
             style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
           >
-            <Text style={{ fontSize: 18, color: colors.primary }}>←</Text>
+            <Text style={{ fontSize: 18, color: theme.colors.accent }}>←</Text>
           </Pressable>
 
           <Pressable
@@ -316,7 +316,7 @@ export default function AnalyticsScreen() {
             <Text
               style={{
                 fontSize: 12,
-                color: colors.foreground,
+                color: theme.colors.textPrimary,
                 fontWeight: '600',
               }}
             >
@@ -328,7 +328,7 @@ export default function AnalyticsScreen() {
             onPress={handleNextPeriod}
             style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
           >
-            <Text style={{ fontSize: 18, color: colors.primary }}>→</Text>
+            <Text style={{ fontSize: 18, color: theme.colors.accent }}>→</Text>
           </Pressable>
         </View>
       </View>
@@ -340,7 +340,7 @@ export default function AnalyticsScreen() {
         style={{ marginBottom: 16 }}
         contentContainerStyle={{
           gap: 6,
-          backgroundColor: colors.surface,
+          backgroundColor: theme.colors.surface,
           borderRadius: 12,
           padding: 4,
         }}
@@ -359,7 +359,7 @@ export default function AnalyticsScreen() {
                 paddingVertical: 10,
                 paddingHorizontal: 14,
                 borderRadius: 8,
-                backgroundColor: activeTab === tab.id ? colors.primary : 'transparent',
+                backgroundColor: activeTab === tab.id ? theme.colors.accent : 'transparent',
                 opacity: pressed ? 0.7 : 1,
               },
             ]}
@@ -370,7 +370,7 @@ export default function AnalyticsScreen() {
                 textAlign: 'center',
                 fontSize: 12,
                 fontWeight: '600',
-                color: activeTab === tab.id ? colors.background : colors.foreground,
+                color: activeTab === tab.id ? theme.colors.textInverse : theme.colors.textPrimary,
               }}
             >
               {tab.label}
@@ -389,8 +389,8 @@ export default function AnalyticsScreen() {
             paddingVertical: 40,
           }}
         >
-          <ActivityIndicator color={colors.primary} size="large" />
-          <Text style={{ marginTop: 12, color: colors.muted }}>Загрузка аналитики...</Text>
+          <ActivityIndicator color={theme.colors.accent} size="large" />
+          <Text style={{ marginTop: 12, color: theme.colors.textMuted }}>Загрузка аналитики...</Text>
         </View>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false}>

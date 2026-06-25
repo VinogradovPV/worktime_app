@@ -1,13 +1,13 @@
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
-import { useColors } from "@/hooks/use-colors";
+import { useAppTheme } from "@/hooks/useAppTheme";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { EditProfileForm } from "@/components/EditProfileForm";
 import { useState } from "react";
 
 export default function ProfileScreen() {
-  const colors = useColors();
+  const theme = useAppTheme();
   const router = useRouter();
   const {
     profile,
@@ -28,7 +28,7 @@ export default function ProfileScreen() {
   if (loading) {
     return (
       <ScreenContainer className="flex items-center justify-center">
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={theme.colors.accent} />
       </ScreenContainer>
     );
   }
@@ -48,7 +48,7 @@ export default function ProfileScreen() {
           <Text className="text-2xl font-bold text-foreground">Редактирование профиля</Text>
           <TouchableOpacity
             className="p-2 rounded-lg"
-            style={{ backgroundColor: colors.surface }}
+            style={{ backgroundColor: theme.colors.surface }}
             onPress={() => setIsEditing(false)}
           >
             <Text className="text-sm font-semibold text-foreground">Закрыть</Text>
@@ -77,7 +77,7 @@ export default function ProfileScreen() {
           <Text className="text-xl font-bold text-foreground text-center">Профиль не создан</Text>
           <TouchableOpacity
             className="p-3 rounded-lg items-center"
-            style={{ backgroundColor: colors.primary }}
+            style={{ backgroundColor: theme.colors.accent }}
             onPress={() => setIsEditing(true)}
           >
             <Text className="text-base font-semibold text-white">Создать профиль</Text>
@@ -101,7 +101,7 @@ export default function ProfileScreen() {
       {profile.departmentId && (
         <View
           className="p-4 rounded-lg gap-2"
-          style={{ backgroundColor: colors.surface }}
+          style={{ backgroundColor: theme.colors.surface }}
         >
           <Text className="text-sm font-semibold text-muted">СТРУКТУРА ОРГАНИЗАЦИИ</Text>
           <Text className="text-base font-semibold text-foreground">
@@ -118,7 +118,7 @@ export default function ProfileScreen() {
       {/* Контактная информация */}
       <View
         className="p-4 rounded-lg gap-3"
-        style={{ backgroundColor: colors.surface }}
+        style={{ backgroundColor: theme.colors.surface }}
       >
         <Text className="text-sm font-semibold text-muted">КОНТАКТНАЯ ИНФОРМАЦИЯ</Text>
         <View>
@@ -136,7 +136,7 @@ export default function ProfileScreen() {
       {/* Настройки приложения */}
       <View
         className="p-4 rounded-lg gap-3"
-        style={{ backgroundColor: colors.surface }}
+        style={{ backgroundColor: theme.colors.surface }}
       >
         <Text className="text-sm font-semibold text-muted">НАСТРОЙКИ ПРИЛОЖЕНИЯ</Text>
         <View className="flex-row justify-between">
@@ -158,7 +158,7 @@ export default function ProfileScreen() {
       {/* Геолокация и рабочие зоны */}
       <TouchableOpacity
         className="p-4 rounded-lg flex-row items-center justify-between"
-        style={{ backgroundColor: colors.surface }}
+        style={{ backgroundColor: theme.colors.surface }}
         onPress={() => router.push('/geofence-settings' as never)}
       >
         <View className="flex-row items-center gap-3">
@@ -174,7 +174,7 @@ export default function ProfileScreen() {
       {/* Кнопка редактирования */}
       <TouchableOpacity
         className="p-4 rounded-lg items-center mt-4"
-        style={{ backgroundColor: colors.primary }}
+        style={{ backgroundColor: theme.colors.accent }}
         onPress={() => setIsEditing(true)}
       >
         <Text className="text-base font-semibold text-white">Редактировать профиль</Text>

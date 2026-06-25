@@ -1,6 +1,6 @@
 import { ScrollView, Text, View, TouchableOpacity, TextInput, Switch, Alert } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
-import { useColors } from "@/hooks/use-colors";
+import { useAppTheme } from "@/hooks/useAppTheme";
 import { useI18n } from "@/hooks/useI18n";
 import { useNotifications } from "@/hooks/useNotifications";
 import { LanguageSelector } from "@/components/LanguageSelector";
@@ -15,7 +15,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function SettingsScreen() {
-  const colors = useColors();
+  const theme = useAppTheme();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { settings, vacationPeriods, updateSettings, addVacation, removeVacation } = useNotifications();
@@ -176,12 +176,12 @@ export default function SettingsScreen() {
         </View>
 
         {/* Выбор языка */}
-        <View className="mb-8 rounded-lg p-4" style={{ backgroundColor: colors.surface }}>
+        <View className="mb-8 rounded-lg p-4" style={{ backgroundColor: theme.colors.surface }}>
           <LanguageSelector />
         </View>
 
         {/* Выбор темы */}
-        <View className="mb-8 rounded-lg p-4" style={{ backgroundColor: colors.surface }}>
+        <View className="mb-8 rounded-lg p-4" style={{ backgroundColor: theme.colors.surface }}>
           <ThemeSelector />
         </View>
 
@@ -190,13 +190,13 @@ export default function SettingsScreen() {
           <Text className="text-lg font-semibold text-foreground mb-4">Уведомления</Text>
 
           {/* Утреннее уведомление */}
-          <View className="rounded-lg p-4 mb-4" style={{ backgroundColor: colors.surface }}>
+          <View className="rounded-lg p-4 mb-4" style={{ backgroundColor: theme.colors.surface }}>
             <View className="flex-row justify-between items-center mb-3">
               <Text className="font-semibold text-foreground">Уведомление о начале дня</Text>
               <Switch
                 value={morningEnabled}
                 onValueChange={setMorningEnabled}
-                trackColor={{ false: colors.border, true: colors.success }}
+                trackColor={{ false: theme.colors.border, true: theme.colors.success }}
               />
             </View>
             {morningEnabled && (
@@ -206,9 +206,9 @@ export default function SettingsScreen() {
                   value={morningTime}
                   onChangeText={setMorningTime}
                   placeholder="09:30"
-                  placeholderTextColor={colors.muted}
+                  placeholderTextColor={theme.colors.textMuted}
                   className="border rounded-lg p-3 text-foreground"
-                  style={{ borderColor: colors.border }}
+                  style={{ borderColor: theme.colors.border }}
                   maxLength={5}
                 />
               </View>
@@ -216,13 +216,13 @@ export default function SettingsScreen() {
           </View>
 
           {/* Вечернее уведомление */}
-          <View className="rounded-lg p-4 mb-4" style={{ backgroundColor: colors.surface }}>
+          <View className="rounded-lg p-4 mb-4" style={{ backgroundColor: theme.colors.surface }}>
             <View className="flex-row justify-between items-center mb-3">
               <Text className="font-semibold text-foreground">Отчет за предыдущий день</Text>
               <Switch
                 value={eveningEnabled}
                 onValueChange={setEveningEnabled}
-                trackColor={{ false: colors.border, true: colors.success }}
+                trackColor={{ false: theme.colors.border, true: theme.colors.success }}
               />
             </View>
             {eveningEnabled && (
@@ -232,9 +232,9 @@ export default function SettingsScreen() {
                   value={eveningTime}
                   onChangeText={setEveningTime}
                   placeholder="10:00"
-                  placeholderTextColor={colors.muted}
+                  placeholderTextColor={theme.colors.textMuted}
                   className="border rounded-lg p-3 text-foreground"
-                  style={{ borderColor: colors.border }}
+                  style={{ borderColor: theme.colors.border }}
                   maxLength={5}
                 />
               </View>
@@ -242,13 +242,13 @@ export default function SettingsScreen() {
           </View>
 
           {/* Напоминание о завершении дня */}
-          <View className="rounded-lg p-4 mb-4" style={{ backgroundColor: colors.surface }}>
+          <View className="rounded-lg p-4 mb-4" style={{ backgroundColor: theme.colors.surface }}>
             <View className="flex-row justify-between items-center mb-3">
               <Text className="font-semibold text-foreground">Напоминание о завершении дня</Text>
               <Switch
                 value={endOfDayEnabled}
                 onValueChange={setEndOfDayEnabled}
-                trackColor={{ false: colors.border, true: colors.success }}
+                trackColor={{ false: theme.colors.border, true: theme.colors.success }}
               />
             </View>
             {endOfDayEnabled && (
@@ -258,9 +258,9 @@ export default function SettingsScreen() {
                   value={endOfDayTime}
                   onChangeText={setEndOfDayTime}
                   placeholder="18:00"
-                  placeholderTextColor={colors.muted}
+                  placeholderTextColor={theme.colors.textMuted}
                   className="border rounded-lg p-3 text-foreground"
-                  style={{ borderColor: colors.border }}
+                  style={{ borderColor: theme.colors.border }}
                   maxLength={5}
                 />
               </View>
@@ -270,7 +270,7 @@ export default function SettingsScreen() {
           {/* Кнопка сохранения */}
           <TouchableOpacity
             className="rounded-lg p-3 items-center justify-center mb-6"
-            style={{ backgroundColor: colors.primary }}
+            style={{ backgroundColor: theme.colors.accent }}
             onPress={handleSaveSettings}
           >
             <Text className="text-white font-semibold">Сохранить настройки</Text>
@@ -282,7 +282,7 @@ export default function SettingsScreen() {
           <Text className="text-lg font-semibold text-foreground mb-4">Управление отпусками</Text>
 
           {/* Форма добавления отпуска */}
-          <View className="rounded-lg p-4 mb-4" style={{ backgroundColor: colors.surface }}>
+          <View className="rounded-lg p-4 mb-4" style={{ backgroundColor: theme.colors.surface }}>
             <Text className="text-sm font-semibold text-foreground mb-3">Добавить период отпуска</Text>
 
             <View className="mb-3">
@@ -291,9 +291,9 @@ export default function SettingsScreen() {
                 value={vacationStartDate}
                 onChangeText={setVacationStartDate}
                 placeholder="2026-06-21"
-                placeholderTextColor={colors.muted}
+                placeholderTextColor={theme.colors.textMuted}
                 className="border rounded-lg p-3 text-foreground"
-                style={{ borderColor: colors.border }}
+                style={{ borderColor: theme.colors.border }}
               />
             </View>
 
@@ -303,9 +303,9 @@ export default function SettingsScreen() {
                 value={vacationEndDate}
                 onChangeText={setVacationEndDate}
                 placeholder="2026-06-28"
-                placeholderTextColor={colors.muted}
+                placeholderTextColor={theme.colors.textMuted}
                 className="border rounded-lg p-3 text-foreground"
-                style={{ borderColor: colors.border }}
+                style={{ borderColor: theme.colors.border }}
               />
             </View>
 
@@ -317,13 +317,13 @@ export default function SettingsScreen() {
                     key={type}
                     className="flex-1 rounded-lg p-2 items-center"
                     style={{
-                      backgroundColor: vacationType === type ? colors.primary : colors.border,
+                      backgroundColor: vacationType === type ? theme.colors.accent : theme.colors.border,
                     }}
                     onPress={() => setVacationType(type)}
                   >
                     <Text
                       className="text-xs font-semibold"
-                      style={{ color: vacationType === type ? "white" : colors.foreground }}
+                      style={{ color: vacationType === type ? "white" : theme.colors.textPrimary }}
                     >
                       {getVacationTypeLabel(type)}
                     </Text>
@@ -334,7 +334,7 @@ export default function SettingsScreen() {
 
             <TouchableOpacity
               className="rounded-lg p-3 items-center justify-center"
-              style={{ backgroundColor: colors.success }}
+              style={{ backgroundColor: theme.colors.success }}
               onPress={handleAddVacation}
             >
               <Text className="text-white font-semibold">Добавить</Text>
@@ -349,7 +349,7 @@ export default function SettingsScreen() {
                 <View
                   key={period.id}
                   className="rounded-lg p-3 mb-2 flex-row justify-between items-center"
-                  style={{ backgroundColor: colors.surface }}
+                  style={{ backgroundColor: theme.colors.surface }}
                 >
                   <View className="flex-1">
                     <Text className="font-semibold text-foreground">
@@ -361,7 +361,7 @@ export default function SettingsScreen() {
                   </View>
                   <TouchableOpacity
                     className="rounded-lg p-2"
-                    style={{ backgroundColor: colors.error }}
+                    style={{ backgroundColor: theme.colors.danger }}
                     onPress={() => handleRemoveVacation(period.id)}
                   >
                     <Text className="text-white text-xs font-semibold">Удалить</Text>
@@ -373,7 +373,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* Раздел информации */}
-        <View className="rounded-lg p-4" style={{ backgroundColor: colors.surface }}>
+        <View className="rounded-lg p-4" style={{ backgroundColor: theme.colors.surface }}>
           <Text className="text-sm font-semibold text-foreground mb-2">Информация</Text>
           <Text className="text-xs text-muted">
             Версия приложения: 1.0.0{"\n"}
