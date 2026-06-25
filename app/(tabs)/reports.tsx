@@ -5,7 +5,7 @@ import { AnimatedStatsGrid, AnimatedStatsCard } from "@/components/AnimatedStats
 import { AnimatedDetailsList } from "@/components/AnimatedDetailsList";
 import { AnimatedLoadingState } from "@/components/AnimatedLoadingState";
 import { ExportOptionsModal } from "@/components/ExportOptionsModal";
-import { useColors } from "@/hooks/use-colors";
+import { useAppTheme } from "@/hooks/useAppTheme";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -23,7 +23,7 @@ import { exportReportToCSV, shareCSVFile } from "@/lib/export/exportToCSV";
 import { exportReportToPDF, sharePDFFile } from "@/lib/export/exportToPDF";
 
 export default function ReportsScreen() {
-  const colors = useColors();
+  const theme = useAppTheme();
   const [selectedPeriod, setSelectedPeriod] = useState<"day" | "week" | "month" | "year">("month");
   const [periodStats, setPeriodStats] = useState<ReportPeriodStats | null>(null);
   const [dayStats, setDayStats] = useState<ReportDayStats[]>([]);
@@ -178,17 +178,17 @@ export default function ReportsScreen() {
   const getDayTypeColor = (dayType: string): string => {
     switch (dayType) {
       case "workday":
-        return colors.success;
+        return theme.colors.success;
       case "weekend":
-        return colors.muted;
+        return theme.colors.calendarWeekend;
       case "holiday":
-        return colors.error;
+        return theme.colors.calendarHoliday;
       case "vacation":
-        return colors.primary;
+        return theme.colors.calendarVacation;
       case "shortened_workday":
-        return colors.warning;
+        return theme.colors.warning;
       default:
-        return colors.foreground;
+        return theme.colors.textPrimary;
     }
   };
 
@@ -274,7 +274,7 @@ export default function ReportsScreen() {
         >
           <View
             className="p-2 rounded-lg"
-            style={{ backgroundColor: colors.primary }}
+            style={{ backgroundColor: theme.colors.accent }}
           >
             <Text className="text-lg">📥</Text>
           </View>
@@ -309,7 +309,7 @@ export default function ReportsScreen() {
 
           {/* Интерактивный график работы */}
           {dayStats.length > 0 && (
-            <View className="mt-6 rounded-lg p-4" style={{ backgroundColor: colors.surface }}>
+            <View className="mt-6 rounded-lg p-4" style={{ backgroundColor: theme.colors.surface }}>
               <Text className="text-sm font-semibold text-foreground mb-4">
                 📊 График работы
               </Text>

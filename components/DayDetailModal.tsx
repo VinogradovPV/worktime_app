@@ -1,5 +1,5 @@
 import { Modal, View, Text, TouchableOpacity, ScrollView } from "react-native";
-import { useColors } from "@/hooks/use-colors";
+import { useAppTheme } from "@/hooks/useAppTheme";
 import { getWorkDay, saveWorkDay, rebuildWorkDayFromEvents } from "@/lib/storage/workdayService";
 import { calculateWorkDayStats, formatTime, formatTimeShort } from "@/lib/storage/workdayStatsService";
 import { useState, useEffect } from "react";
@@ -15,7 +15,7 @@ interface DayDetailModalProps {
 }
 
 export function DayDetailModal({ visible, date, dayType, vacationType, onClose }: DayDetailModalProps) {
-  const colors = useColors();
+  const theme = useAppTheme();
   const [workDay, setWorkDay] = useState<WorkDay | null>(null);
   const [dayStats, setDayStats] = useState({
     totalWorkTime: 0,
@@ -108,15 +108,15 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
     switch (type) {
       case "work_start":
       case "work_end":
-        return colors.success;
+        return theme.colors.success;
       case "break_start":
       case "break_end":
-        return colors.warning;
+        return theme.colors.warning;
       case "temporary_exit_start":
       case "temporary_exit_end":
-        return "#F97316"; // orange
+        return theme.colors.orange;
       default:
-        return colors.foreground;
+        return theme.colors.textPrimary;
     }
   };
 
@@ -125,13 +125,13 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
       case "weekend":
         return {
           label: "Выходной день",
-          color: colors.muted,
+          color: theme.colors.textMuted,
           description: "Суббота или воскресенье",
         };
       case "holiday":
         return {
           label: "Праздничный день",
-          color: colors.error,
+          color: theme.colors.danger,
           description: "Праздничный день согласно производственному календарю",
         };
       case "vacation":
@@ -142,14 +142,14 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
         };
         return {
           label: vacationLabels[vacationType as keyof typeof vacationLabels] || "Отпуск",
-          color: vacationType === "sick_leave" ? colors.warning : colors.primary,
+          color: vacationType === "sick_leave" ? theme.colors.warning : theme.colors.accent,
           description: "Период отпуска",
         };
       case "workday":
       default:
         return {
           label: "Рабочий день",
-          color: colors.success,
+          color: theme.colors.success,
           description: "Обычный рабочий день",
         };
     }
@@ -161,9 +161,9 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
   return (
     <>
       <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-        <View className="flex-1" style={{ backgroundColor: colors.background + "E6" }}>
+        <View className="flex-1" style={{ backgroundColor: theme.colors.background + "E6" }}>
           {/* Header */}
-          <View className="flex-row justify-between items-center px-4 pt-4 pb-4 border-b" style={{ borderBottomColor: colors.border }}>
+          <View className="flex-row justify-between items-center px-4 pt-4 pb-4 border-b" style={{ borderBottomColor: theme.colors.border }}>
             <Text className="text-lg font-bold text-foreground">Детали дня</Text>
             <TouchableOpacity onPress={onClose}>
               <Text className="text-2xl text-muted">✕</Text>
@@ -188,7 +188,7 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
 
             {/* Статистика рабочего времени */}
             {dayType === "workday" && (
-              <View className="mb-6 p-4 rounded-lg" style={{ backgroundColor: colors.surface }}>
+              <View className="mb-6 p-4 rounded-lg" style={{ backgroundColor: theme.colors.surface }}>
                 <Text className="text-sm font-semibold text-foreground mb-4">Статистика рабочего времени</Text>
 
                 <View className="flex-row justify-between mb-4">
@@ -207,7 +207,7 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
                 </View>
 
                 {dayStats.temporaryExitTime > 0 && (
-                  <View className="mb-4 p-3 rounded-lg" style={{ backgroundColor: colors.background }}>
+                  <View className="mb-4 p-3 rounded-lg" style={{ backgroundColor: theme.colors.background }}>
                     <Text className="text-xs text-muted mb-1">Временные выходы</Text>
                     <Text className="text-lg font-bold" style={{ color: "#F97316" }}>
                       {formatTimeShort(dayStats.temporaryExitTime)}
@@ -215,7 +215,7 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
                   </View>
                 )}
 
-                <View className="p-3 rounded-lg" style={{ backgroundColor: colors.background }}>
+                <View className="p-3 rounded-lg" style={{ backgroundColor: theme.colors.background }}>
                   <Text className="text-xs text-muted">Событий: {dayStats.eventsCount}</Text>
                 </View>
               </View>
@@ -231,8 +231,8 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
                     key={event.id}
                     className="mb-3 p-3 rounded-lg border"
                     style={{
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
+                      backgroundColor: theme.colors.surface,
+                      borderColor: theme.colors.border,
                     }}
                   >
                     <View className="flex-row justify-between items-start mb-2">
@@ -250,13 +250,13 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
 
             {/* Пустое состояние */}
             {workDay && workDay.events.length === 0 && dayType === "workday" && (
-              <View className="mb-6 p-4 rounded-lg items-center" style={{ backgroundColor: colors.surface }}>
+              <View className="mb-6 p-4 rounded-lg items-center" style={{ backgroundColor: theme.colors.surface }}>
                 <Text className="text-sm text-muted">Нет данных о рабочих событиях</Text>
               </View>
             )}
 
             {/* Информация */}
-            <View className="mb-6 p-4 rounded-lg" style={{ backgroundColor: colors.surface }}>
+            <View className="mb-6 p-4 rounded-lg" style={{ backgroundColor: theme.colors.surface }}>
               <Text className="text-xs text-muted">
                 {dayType === "workday"
                   ? "Здесь отображается информация о рабочих событиях и времени, проведенном на работе в этот день."
@@ -267,11 +267,11 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
 
           {/* Кнопка редактирования событий (только для рабочих дней с данными или без данных) */}
           {dayType === "workday" && (workDay || date) && (
-            <View className="px-4 py-4 border-t" style={{ borderTopColor: colors.border }}>
+            <View className="px-4 py-4 border-t" style={{ borderTopColor: theme.colors.border }}>
               <TouchableOpacity
                 onPress={() => setEditorVisible(true)}
                 className="py-3 rounded-lg items-center"
-                style={{ backgroundColor: colors.primary }}
+                style={{ backgroundColor: theme.colors.accent }}
               >
                 <Text className="text-background font-semibold">✏️ Редактировать события</Text>
               </TouchableOpacity>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, Modal, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { Animated } from 'react-native';
-import { useColors } from '@/hooks/use-colors';
+import { useAppTheme } from '@/hooks/useAppTheme';
 import { cn } from '@/lib/utils';
 import * as Haptics from 'expo-haptics';
 
@@ -43,7 +43,7 @@ export function ExportOptionsModal({
   onExport,
   isLoading = false,
 }: ExportOptionsModalProps) {
-  const colors = useColors();
+  const theme = useAppTheme();
   const [selectedFormat, setSelectedFormat] = useState<'csv' | 'pdf' | null>(null);
   const scaleAnim = React.useRef(new Animated.Value(0)).current;
 
@@ -82,7 +82,7 @@ export function ExportOptionsModal({
         <Animated.View
           style={{
             transform: [{ scale: scaleAnim }],
-            backgroundColor: colors.surface,
+            backgroundColor: theme.colors.surface,
           }}
           className="w-4/5 rounded-2xl p-6"
         >
@@ -115,7 +115,7 @@ export function ExportOptionsModal({
                   )}
                 >
                   {selectedFormat === option.id && isLoading ? (
-                    <ActivityIndicator color={colors.primary} size="small" />
+                    <ActivityIndicator color={theme.colors.accent} size="small" />
                   ) : (
                     <Text className="text-2xl">{option.icon}</Text>
                   )}
