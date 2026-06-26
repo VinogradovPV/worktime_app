@@ -5,6 +5,7 @@
 
 import { WorkDay } from '@/shared/types/workday';
 import { getBackendApiClient } from './backend-api-client';
+import { getSyncNotificationsService } from './sync-notifications';
 import { getTodayWorkDay, saveWorkDay } from '@/lib/storage/workdayService';
 import { formatDate } from '@/lib/utils/dateUtils';
 
@@ -24,6 +25,7 @@ interface SyncConflict {
 
 class WorkDaySyncService {
   private apiClient = getBackendApiClient();
+  private notifications = getSyncNotificationsService();
   private userId: string = 'default_user'; // TODO: получать из профиля пользователя
 
   /**
@@ -44,6 +46,7 @@ class WorkDaySyncService {
       return true;
     } catch (error) {
       console.error('[WorkDaySync] Sync failed:', error);
+      this.notifications.notifySyncError('Не удалось синхронизировать рабочий день');
       return false;
     }
   }

@@ -4,6 +4,7 @@
  */
 
 import { getBackendApiClient } from './backend-api-client';
+import { getSyncNotificationsService } from './sync-notifications';
 import { 
   getProductionCalendar as getLocalCalendar,
   saveProductionCalendar as saveLocalCalendar,
@@ -34,6 +35,7 @@ interface Vacation {
 
 class CalendarSyncService {
   private apiClient = getBackendApiClient();
+  private notifications = getSyncNotificationsService();
   private userId: string = 'default_user';
 
   /**
@@ -202,9 +204,10 @@ class CalendarSyncService {
       result.success = true;
       return result;
     } catch (error) {
+      console.error('[CalendarSync] Sync vacations failed:', error);
       result.success = false;
-      result.errors.push(`Calendar sync failed: ${error}`);
-      console.error('[CalendarSync] Calendar sync error:', error);
+      result.errors.push(error instanceof Error ? error.message : 'Unknown error');
+      this.notifications.notifySyncError('Не удалось синхронизировать отпуска');
       return result;
     }
   }
