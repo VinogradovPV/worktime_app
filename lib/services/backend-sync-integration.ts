@@ -11,6 +11,7 @@
 import { getWorkDaySyncService } from './workday-sync-service';
 import { getUserProfileSyncService } from './user-profile-sync-service';
 import { getBackendApiClient } from './backend-api-client';
+import { getSyncNotificationsService } from './sync-notifications';
 import { getTodayWorkDay } from '@/lib/storage/workdayService';
 import { formatDate } from '@/lib/utils/dateUtils';
 
@@ -24,6 +25,7 @@ class BackendSyncIntegration {
   private workDaySync = getWorkDaySyncService();
   private profileSync = getUserProfileSyncService();
   private apiClient = getBackendApiClient();
+  private notifications = getSyncNotificationsService();
   private config: BackendSyncConfig;
   private syncTimer: ReturnType<typeof setInterval> | null = null;
   private isSyncing = false;
@@ -46,6 +48,7 @@ class BackendSyncIntegration {
 
       if (!isHealthy) {
         console.warn('[BackendSyncIntegration] API health check failed');
+        this.notifications.notifySyncError('Не удалось подключиться к серверу');
         return false;
       }
 
@@ -59,6 +62,7 @@ class BackendSyncIntegration {
       return true;
     } catch (error) {
       console.error('[BackendSyncIntegration] Initialization failed:', error);
+      this.notifications.notifySyncError('Ошибка инициализации синхронизации');
       return false;
     }
   }
@@ -78,9 +82,15 @@ class BackendSyncIntegration {
       }
 
       const result = await this.workDaySync.syncWorkDay(workDay);
+      
+      if (!result) {
+        this.notifications.notifySyncError('Ошибка синхронизации рабочего дня');
+      }
+      
       return result;
     } catch (error) {
       console.error('[BackendSyncIntegration] Sync failed:', error);
+      this.notifications.notifySyncError('Ошибка синхронизации рабочего дня');
       return false;
     }
   }
@@ -93,9 +103,15 @@ class BackendSyncIntegration {
       console.log('[BackendSyncIntegration] Syncing user profile');
 
       const result = await this.profileSync.syncUserProfile();
+      
+      if (!result.success) {
+        this.notifications.notifySyncError('Ошибка синхронизации профиля');
+      }
+      
       return result.success;
     } catch (error) {
       console.error('[BackendSyncIntegration] Profile sync failed:', error);
+      this.notifications.notifySyncError('Ошибка синхронизации профиля');
       return false;
     }
   }
@@ -128,6 +144,7 @@ class BackendSyncIntegration {
       return workDayResult && profileResult;
     } catch (error) {
       console.error('[BackendSyncIntegration] Full sync failed:', error);
+      this.notifications.notifySyncError('Ошибка полной синхронизации');
       return false;
     } finally {
       this.isSyncing = false;

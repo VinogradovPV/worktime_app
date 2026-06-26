@@ -5,6 +5,7 @@
 
 import { UserProfile, getUserProfile as getLocalUserProfile, saveUserProfile as saveLocalUserProfile } from '@/lib/storage/userProfileStorage';
 import { getBackendApiClient } from './backend-api-client';
+import { getSyncNotificationsService } from './sync-notifications';
 
 interface ProfileSyncResult {
   success: boolean;
@@ -13,6 +14,7 @@ interface ProfileSyncResult {
 
 class UserProfileSyncService {
   private apiClient = getBackendApiClient();
+  private notifications = getSyncNotificationsService();
   private userId: string = 'default_user'; // TODO: получать из аутентификации
 
   /**
@@ -46,6 +48,7 @@ class UserProfileSyncService {
       };
     } catch (error) {
       console.error('[ProfileSync] Sync failed:', error);
+      this.notifications.notifySyncError('Не удалось синхронизировать профиль');
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Sync failed',
