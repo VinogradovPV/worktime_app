@@ -27,6 +27,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { initializeAdaptiveSyncManager, shutdownAdaptiveSyncManager } from "@/lib/services/adaptive-sync-manager";
 import { getAdaptiveSyncConfig } from "@/lib/_core/sync-config";
+import { createBackendSyncIntegration } from "@/lib/services/backend-sync-integration";
 
 const ONBOARDING_KEY = "onboarding_completed";
 
@@ -92,6 +93,24 @@ export default function RootLayout() {
         console.log('[App] AdaptiveSyncManager initialized');
       } catch (error) {
         console.error('[App] Error initializing AdaptiveSyncManager:', error);
+      }
+
+      // Initialize Backend Sync Integration
+      try {
+        const userId = await AsyncStorage.getItem('user_id') || 'default_user';
+        const backendSync = createBackendSyncIntegration({
+          userId,
+          autoSync: true,
+          syncInterval: 10 * 60 * 1000, // 10 minutes
+        });
+        const initialized = await backendSync.initialize();
+        if (initialized) {
+          console.log('[App] Backend Sync Integration initialized');
+        } else {
+          console.warn('[App] Backend Sync Integration initialization failed');
+        }
+      } catch (error) {
+        console.error('[App] Error initializing Backend Sync Integration:', error);
       }
     };
 
