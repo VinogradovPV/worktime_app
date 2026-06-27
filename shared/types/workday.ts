@@ -34,7 +34,8 @@ export interface WorkEvent {
 
 export interface WorkDay {
   id: string;
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD (deprecated, use businessDate instead)
+  businessDate: string; // YYYY-MM-DD - дата начала рабочего дня
   status: WorkDayStatus;
 
   workStartAt: string | null; // ISO 8601
@@ -49,6 +50,13 @@ export interface WorkDay {
   totalBreakMs: number;
   totalTemporaryExitMs: number;
   work95Ms: number;
+
+  // Признак того, что рабочий день пересекает полночь
+  crossesMidnight: boolean;
+
+  // Требует проверки (если работал более 24 часов)
+  requires_review: boolean;
+  reviewReason?: string; // Причина требования проверки
 
   createdAt: string; // ISO 8601
   updatedAt: string; // ISO 8601
