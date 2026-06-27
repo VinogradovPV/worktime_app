@@ -286,6 +286,7 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
         const editorWorkDay: WorkDay = workDay ?? {
           id: `${Date.now()}-new`,
           date: dateStr,
+          businessDate: dateStr,
           status: 'not_started',
           workStartAt: null,
           workEndAt: null,
@@ -296,6 +297,8 @@ export function DayDetailModal({ visible, date, dayType, vacationType, onClose }
           totalBreakMs: 0,
           totalTemporaryExitMs: 0,
           work95Ms: 0,
+          crossesMidnight: false,
+          requires_review: false,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };

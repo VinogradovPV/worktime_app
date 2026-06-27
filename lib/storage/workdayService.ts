@@ -36,6 +36,7 @@ export function createEmptyWorkDay(date: string): WorkDay {
   return {
     id: generateId(),
     date,
+    businessDate: date,
     status: 'not_started',
     workStartAt: null,
     workEndAt: null,
@@ -46,6 +47,8 @@ export function createEmptyWorkDay(date: string): WorkDay {
     totalBreakMs: 0,
     totalTemporaryExitMs: 0,
     work95Ms: 0,
+    crossesMidnight: false,
+    requires_review: false,
     createdAt: now,
     updatedAt: now,
   };
