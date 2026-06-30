@@ -1,5 +1,4 @@
 import { Platform } from "react-native";
-import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "./auth";
 
 type ApiResponse<T> = {
@@ -7,40 +6,34 @@ type ApiResponse<T> = {
   error?: string;
 };
 
+// External API configuration
+const EXTERNAL_API_BASE_URL = "https://worktimeapi.duckdns.org";
+const EXTERNAL_API_TOKEN = "6b7a58028382f9b59413cdea2a028ab17ac8545a9c5a43cf4e010c35a076e200";
+
 export async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    "Authorization": `Bearer ${EXTERNAL_API_TOKEN}`,
     ...((options.headers as Record<string, string>) || {}),
   };
 
-  // Determine the auth method:
-  // - Native platform: use stored session token as Bearer auth
-  // - Web (including iframe): use cookie-based auth (browser handles automatically)
-  //   Cookie is set on backend domain via POST /api/auth/session after receiving token via postMessage
+  // Add session token for native platform if available
   if (Platform.OS !== "web") {
     const sessionToken = await Auth.getSessionToken();
-    console.log("[API] apiCall:", {
-      endpoint,
-      hasToken: !!sessionToken,
-      method: options.method || "GET",
-    });
     if (sessionToken) {
       headers["Authorization"] = `Bearer ${sessionToken}`;
-      console.log("[API] Authorization header added");
+      console.log("[API] Using session token for native platform");
     }
-  } else {
-    console.log("[API] apiCall:", { endpoint, platform: "web", method: options.method || "GET" });
   }
 
-  const baseUrl = getApiBaseUrl();
-  // Ensure no double slashes between baseUrl and endpoint
+  const baseUrl = EXTERNAL_API_BASE_URL;
   const cleanBaseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
-  const url = baseUrl ? `${cleanBaseUrl}${cleanEndpoint}` : endpoint;
-  console.log("[API] Full URL:", url);
+  const url = `${cleanBaseUrl}${cleanEndpoint}`;
+  
+  console.log("[API] Making request to:", url);
 
   try {
-    console.log("[API] Making request...");
     const response = await fetch(url, {
       ...options,
       headers,
@@ -48,14 +41,6 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
     });
 
     console.log("[API] Response status:", response.status, response.statusText);
-    const responseHeaders = Object.fromEntries(response.headers.entries());
-    console.log("[API] Response headers:", responseHeaders);
-
-    // Check if Set-Cookie header is present (cookies are automatically handled in React Native)
-    const setCookie = response.headers.get("Set-Cookie");
-    if (setCookie) {
-      console.log("[API] Set-Cookie header received:", setCookie);
-    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -89,48 +74,59 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
   }
 }
 
-// OAuth callback handler - exchange code for session token
-// Calls /api/oauth/mobile endpoint which returns JSON with app_session_id and user
-export async function exchangeOAuthCode(
-  code: string,
-  state: string,
-): Promise<{ sessionToken: string; user: any }> {
-  console.log("[API] exchangeOAuthCode called");
-  // Use GET with query params
-  const params = new URLSearchParams({ code, state });
-  const endpoint = `/api/oauth/mobile?${params.toString()}`;
-  console.log("[API] Calling OAuth mobile endpoint:", endpoint);
-  const result = await apiCall<{ app_session_id: string; user: any }>(endpoint);
+/**
+ * Authentication API calls
+ */
 
-  // Convert app_session_id to sessionToken for compatibility
-  const sessionToken = result.app_session_id;
-  console.log("[API] OAuth exchange result:", {
-    hasSessionToken: !!sessionToken,
-    hasUser: !!result.user,
-    sessionToken: sessionToken ? `${sessionToken.substring(0, 50)}...` : null,
+// Register new user
+export async function register(data: {
+  login: string;
+  password: string;
+  displayName: string;
+  orgUnitId: number;
+  positionId: number;
+}): Promise<{ user: any; token: string }> {
+  return apiCall("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify(data),
   });
+}
 
-  return {
-    sessionToken,
-    user: result.user,
-  };
+// Login user
+export async function login(login: string, password: string): Promise<{ token: string; user: any }> {
+  const result = await apiCall<{ token: string; user: any }>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ login, password }),
+  });
+  
+  // Store session token
+  if (result.token) {
+    await Auth.setSessionToken(result.token);
+  }
+  
+  return result;
 }
 
 // Logout
 export async function logout(): Promise<void> {
-  await apiCall<void>("/api/auth/logout", {
-    method: "POST",
-  });
+  try {
+    await apiCall<void>("/api/auth/logout", {
+      method: "POST",
+    });
+  } finally {
+    await Auth.removeSessionToken();
+  }
 }
 
-// Get current authenticated user (web uses cookie-based auth)
+// Get current authenticated user
 export async function getMe(): Promise<{
   id: number;
-  openId: string;
-  name: string | null;
-  email: string | null;
-  loginMethod: string | null;
-  lastSignedIn: string;
+  login: string;
+  displayName: string | null;
+  role: string;
+  status: string;
+  orgUnitId: number;
+  positionId: number;
 } | null> {
   try {
     const result = await apiCall<{ user: any }>("/api/auth/me");
@@ -141,32 +137,157 @@ export async function getMe(): Promise<{
   }
 }
 
-// Establish session cookie on the backend (3000-xxx domain)
-// Called after receiving token via postMessage to get a proper Set-Cookie from the backend
-export async function establishSession(token: string): Promise<boolean> {
+// Change password
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await apiCall<void>("/api/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
+/**
+ * Admin API calls
+ */
+
+// Get all users
+export async function getUsers(): Promise<any[]> {
+  const result = await apiCall<{ users: any[] }>("/api/admin/users");
+  return result.users || [];
+}
+
+// Approve user registration
+export async function approveUser(userId: number): Promise<void> {
+  await apiCall<void>(`/api/admin/users/${userId}/approve`, {
+    method: "POST",
+  });
+}
+
+// Reject user registration
+export async function rejectUser(userId: number): Promise<void> {
+  await apiCall<void>(`/api/admin/users/${userId}/reject`, {
+    method: "POST",
+  });
+}
+
+// Block user
+export async function blockUser(userId: number): Promise<void> {
+  await apiCall<void>(`/api/admin/users/${userId}/block`, {
+    method: "POST",
+  });
+}
+
+// Unblock user
+export async function unblockUser(userId: number): Promise<void> {
+  await apiCall<void>(`/api/admin/users/${userId}/unblock`, {
+    method: "POST",
+  });
+}
+
+// Reset user password
+export async function resetPassword(userId: number): Promise<{ tempPassword: string }> {
+  return apiCall("/api/admin/users/{userId}/reset-password", {
+    method: "POST",
+  });
+}
+
+// Get organization units
+export async function getOrgUnits(): Promise<any[]> {
+  const result = await apiCall<{ orgUnits: any[] }>("/api/admin/org-units");
+  return result.orgUnits || [];
+}
+
+// Create organization unit
+export async function createOrgUnit(data: {
+  name: string;
+  shortName: string;
+  type: string;
+  parentId?: number;
+}): Promise<any> {
+  return apiCall("/api/admin/org-units", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+// Get positions
+export async function getPositions(): Promise<any[]> {
+  const result = await apiCall<{ positions: any[] }>("/api/admin/positions");
+  return result.positions || [];
+}
+
+// Create position
+export async function createPosition(data: {
+  name: string;
+  shortName: string;
+}): Promise<any> {
+  return apiCall("/api/admin/positions", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+// Get audit logs
+export async function getAuditLogs(filters?: {
+  userId?: number;
+  action?: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<any[]> {
+  const params = new URLSearchParams();
+  if (filters?.userId) params.append("userId", String(filters.userId));
+  if (filters?.action) params.append("action", filters.action);
+  if (filters?.startDate) params.append("startDate", filters.startDate);
+  if (filters?.endDate) params.append("endDate", filters.endDate);
+
+  const result = await apiCall<{ logs: any[] }>(`/api/admin/audit-logs?${params.toString()}`);
+  return result.logs || [];
+}
+
+// Assign role to user
+export async function assignRole(userId: number, role: string): Promise<void> {
+  await apiCall<void>(`/api/admin/users/${userId}/assign-role`, {
+    method: "POST",
+    body: JSON.stringify({ role }),
+  });
+}
+
+// OAuth callback handler - exchange code for session token
+export async function exchangeOAuthCode(
+  code: string,
+  state: string,
+): Promise<{ sessionToken: string; user: any }> {
+  console.log("[API] exchangeOAuthCode called");
+  const params = new URLSearchParams({ code, state });
+  const endpoint = `/api/oauth/mobile?${params.toString()}`;
+  console.log("[API] Calling OAuth mobile endpoint:", endpoint);
+  
   try {
-    console.log("[API] establishSession: setting cookie on backend...");
-    const baseUrl = getApiBaseUrl();
-    const url = `${baseUrl}/api/auth/session`;
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      credentials: "include", // Important: allows Set-Cookie to be stored
+    const result = await apiCall<{ app_session_id: string; user: any }>(endpoint);
+    const sessionToken = result.app_session_id;
+    console.log("[API] OAuth exchange result:", {
+      hasSessionToken: !!sessionToken,
+      hasUser: !!result.user,
     });
-
-    if (!response.ok) {
-      console.error("[API] establishSession failed:", response.status);
-      return false;
-    }
-
-    console.log("[API] establishSession: cookie set successfully");
-    return true;
+    return {
+      sessionToken,
+      user: result.user,
+    };
   } catch (error) {
-    console.error("[API] establishSession error:", error);
+    console.error("[API] OAuth exchange failed:", error);
+    throw error;
+  }
+}
+
+// Test API connection
+export async function testConnection(): Promise<boolean> {
+  try {
+    const response = await fetch(`${EXTERNAL_API_BASE_URL}/health`, {
+      headers: {
+        "Authorization": `Bearer ${EXTERNAL_API_TOKEN}`,
+      },
+    });
+    return response.ok;
+  } catch {
     return false;
   }
 }

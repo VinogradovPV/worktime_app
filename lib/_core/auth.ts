@@ -9,6 +9,8 @@ export type User = {
   email: string | null;
   loginMethod: string | null;
   lastSignedIn: Date;
+  role?: string;
+  status?: string;
 };
 
 export async function getSessionToken(): Promise<string | null> {
