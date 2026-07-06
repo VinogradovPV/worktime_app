@@ -1,5 +1,6 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
-import type { User } from "../../drizzle/schema";
+// User type removed - using API types instead
+type User = any; // TODO: Define User type from API
 import { sdk } from "./sdk";
 
 export type TrpcContext = {
