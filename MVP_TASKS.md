@@ -1,386 +1,333 @@
-# MVP Implementation Tasks - Prioritized
+# MVP Задачи - WorkTime App
 
-**Last Updated:** July 6, 2026  
-**Status:** Planning Phase  
+**Last Updated:** July 7, 2026  
+**Status:** Active Development  
 **Total Tasks:** 15  
-**Completed:** 0  
+**Completed:** 1  
 **In Progress:** 0  
 **Blocked:** 0
 
 ---
 
-## 🔴 CRITICAL TASKS (Must Complete First)
+## 🟢 COMPLETED TASKS
 
-### Task 1: Fix TypeScript Errors
-- **Status:** ❌ NOT STARTED
+### ✅ Task 1: Fix TypeScript Errors
+- **Status:** ✅ COMPLETED
+- **Priority:** CRITICAL
+- **Actual Time:** 3 hours
+- **Completion Date:** July 7, 2026
+- **Description:** Removed broken tRPC sync references and fixed TypeScript compilation
+- **Changes Made:**
+  - Deleted scripts/create-first-admin.ts
+  - Rewrote lib/sync/syncService.ts for REST API
+  - Updated API functions uploadWorkDays and downloadWorkDays
+  - Fixed all saveWorkDay calls
+- **Result:** `pnpm run check` passes with 0 errors ✅
+
+---
+
+## 🔴 CRITICAL TASKS (Next Priority)
+
+### Task 2: Implement Auth Endpoints
+- **Status:** ⏳ NOT STARTED
 - **Priority:** CRITICAL (Blocks all other tasks)
-- **Estimated Time:** 2-3 hours
-- **Assigned To:** TBD
-- **Description:** Remove broken tRPC sync references and fix TypeScript compilation
-- **Files Affected:**
-  - `lib/sync/syncService.ts` - Replace tRPC calls with REST API
-  - `server/routers.ts` - Remove commented-out sync router
+- **Estimated Time:** 4-5 hours
+- **Description:** Create REST API endpoints for authentication on FastAPI server
+- **Endpoints to Create:**
+  1. POST /api/v1/auth/login - User login with credentials
+  2. POST /api/v1/auth/refresh - Token refresh using refresh_token
+  3. POST /api/v1/auth/logout - User logout
+  4. GET /api/v1/auth/me - Get current user info
+- **Files to Create/Update:**
+  - server/_core/auth-api.ts - NEW (create auth endpoints)
+  - server/_core/index.ts - Update to mount endpoints
+  - server/_core/jwt.ts - Use existing JWT utilities
 - **Acceptance Criteria:**
-  - [ ] `pnpm run check` passes with 0 errors
-  - [ ] No TypeScript compilation errors
-  - [ ] Dev server runs without errors
+  - [ ] All 4 endpoints respond correctly
+  - [ ] JWT tokens are properly signed (HS256)
+  - [ ] Invalid credentials return 401
+  - [ ] Expired tokens are rejected
+  - [ ] Access token: 15-30 minutes, Refresh token: 7 days
+  - [ ] Passwords verified with bcrypt
+- **Dependencies:** None
+- **Blocked By:** None
+- **Test Credentials:**
+  - login: p.vinogradov, password: VinogradovPavel2024!
+  - login: v.kultsev, password: KultsevVladimir2024!
+
+---
+
+### Task 3: Test Auth Flow End-to-End
+- **Status:** ⏳ BLOCKED (Waiting for Task 2)
+- **Priority:** CRITICAL
+- **Estimated Time:** 2-3 hours
+- **Description:** Verify authentication works from mobile client to server
+- **Test Scenarios:**
+  1. Login with valid credentials → receive tokens
+  2. Use access token to call GET /api/v1/auth/me
+  3. Wait for access token to expire → call refresh
+  4. Verify new access token works
+  5. Logout → tokens invalidated
+- **Files to Test:**
+  - lib/_core/api.ts (login, refresh, logout, getMe)
+  - hooks/use-auth.ts (useAuth hook)
+  - lib/_core/auth.ts (token storage)
+- **Acceptance Criteria:**
+  - [ ] Login returns valid tokens
+  - [ ] Tokens stored in SecureStore
+  - [ ] Refresh token works correctly
+  - [ ] Logout clears tokens
+  - [ ] useAuth hook updates state correctly
+- **Dependencies:** Task 2
+- **Blocked By:** Task 2
+
+---
+
+## 🟡 HIGH PRIORITY TASKS
+
+### Task 4: Implement Admin Endpoints
+- **Status:** ⏳ NOT STARTED
+- **Priority:** HIGH
+- **Estimated Time:** 3-4 hours
+- **Description:** Create admin endpoints for user management
+- **Endpoints to Create:**
+  1. GET /api/v1/admin/registration-requests - List pending registrations
+  2. POST /api/v1/admin/users/{id}/approve - Approve user registration
+  3. POST /api/v1/admin/users/{id}/reject - Reject user registration
+  4. GET /api/v1/admin/users - List all users
+  5. POST /api/v1/admin/users/{id}/reset-password - Reset user password
+- **Acceptance Criteria:**
+  - [ ] Only admin users can access these endpoints
+  - [ ] All endpoints require Bearer token
+  - [ ] Responses follow API contract
+- **Dependencies:** Task 2 (Auth endpoints)
+- **Blocked By:** Task 2
+
+---
+
+### Task 5: Implement Directory Endpoints
+- **Status:** ⏳ NOT STARTED
+- **Priority:** HIGH
+- **Estimated Time:** 2-3 hours
+- **Description:** Create endpoints for org units and positions
+- **Endpoints to Create:**
+  1. GET /api/v1/directories/org-units - List org units
+  2. POST /api/v1/directories/org-units - Create org unit (admin only)
+  3. GET /api/v1/directories/positions - List positions
+  4. POST /api/v1/directories/positions - Create position (admin only)
+- **Acceptance Criteria:**
+  - [ ] All endpoints return correct data
+  - [ ] Create endpoints require admin role
+  - [ ] Responses follow API contract
+- **Dependencies:** Task 2 (Auth endpoints)
+- **Blocked By:** Task 2
+
+---
+
+### Task 6: Implement Sync Endpoints
+- **Status:** ⏳ NOT STARTED
+- **Priority:** HIGH
+- **Estimated Time:** 2-3 hours
+- **Description:** Create endpoints for work day synchronization
+- **Endpoints to Create:**
+  1. POST /api/v1/sync/upload-workdays - Upload work days
+  2. GET /api/v1/sync/download-workdays - Download work days
+  3. GET /api/v1/sync/status - Get sync status
+- **Acceptance Criteria:**
+  - [ ] Upload stores work days in database
+  - [ ] Download retrieves work days for date range
+  - [ ] Status returns correct pending count
+- **Dependencies:** Task 2 (Auth endpoints)
+- **Blocked By:** Task 2
+
+---
+
+## 🟠 MEDIUM PRIORITY TASKS
+
+### Task 7: Implement User Registration
+- **Status:** ⏳ NOT STARTED
+- **Priority:** MEDIUM
+- **Estimated Time:** 2-3 hours
+- **Description:** Create POST /api/v1/auth/register endpoint
+- **Requirements:**
+  - Create user with status "pending"
+  - Validate input (login, password, displayName, orgUnitId, positionId)
+  - Send notification to admins
+  - Return status "pending" (not tokens)
+- **Acceptance Criteria:**
+  - [ ] New user created with correct fields
+  - [ ] Status is "pending" (not "active")
+  - [ ] Role is "user" (not selectable)
+  - [ ] No tokens returned
+  - [ ] Admin notification sent
+- **Dependencies:** Task 2 (Auth endpoints)
+- **Blocked By:** Task 2
+
+---
+
+### Task 8: Implement Change Password
+- **Status:** ⏳ NOT STARTED
+- **Priority:** MEDIUM
+- **Estimated Time:** 1-2 hours
+- **Description:** Create POST /api/v1/auth/change-password endpoint
+- **Requirements:**
+  - Verify current password
+  - Update password with bcrypt
+  - Invalidate all existing tokens
+- **Acceptance Criteria:**
+  - [ ] Password updated correctly
+  - [ ] Old password verified
+  - [ ] New password hashed with bcrypt
+  - [ ] User logged out after change
+- **Dependencies:** Task 2 (Auth endpoints)
+- **Blocked By:** Task 2
+
+---
+
+### Task 9: Implement Forgot Password
+- **Status:** ⏳ NOT STARTED
+- **Priority:** MEDIUM
+- **Estimated Time:** 2-3 hours
+- **Description:** Create POST /api/v1/auth/forgot-password endpoint
+- **Requirements:**
+  - Generate reset token
+  - Send reset link via email
+  - Validate reset token
+  - Allow password reset
+- **Acceptance Criteria:**
+  - [ ] Reset token generated
+  - [ ] Email sent with reset link
+  - [ ] Token expires after 24 hours
+  - [ ] Password reset works with valid token
+- **Dependencies:** Task 2 (Auth endpoints)
+- **Blocked By:** Task 2
+
+---
+
+## 🔵 LOW PRIORITY TASKS
+
+### Task 10: Add Logging and Monitoring
+- **Status:** ⏳ NOT STARTED
+- **Priority:** LOW
+- **Estimated Time:** 2-3 hours
+- **Description:** Add structured logging for debugging and monitoring
+- **Requirements:**
+  - Log all API requests/responses
+  - Log authentication events
+  - Log errors with stack traces
+- **Dependencies:** All endpoints
+- **Blocked By:** None
+
+---
+
+### Task 11: Add Rate Limiting
+- **Status:** ⏳ NOT STARTED
+- **Priority:** LOW
+- **Estimated Time:** 1-2 hours
+- **Description:** Implement rate limiting for API endpoints
+- **Requirements:**
+  - Limit login attempts (5 per minute)
+  - Limit API calls (100 per minute per user)
+  - Return 429 Too Many Requests
+- **Dependencies:** Task 2 (Auth endpoints)
+- **Blocked By:** None
+
+---
+
+### Task 12: Add Request Validation
+- **Status:** ⏳ NOT STARTED
+- **Priority:** LOW
+- **Estimated Time:** 2-3 hours
+- **Description:** Add Pydantic validation for all endpoints
+- **Requirements:**
+  - Validate request bodies
+  - Validate query parameters
+  - Return 400 Bad Request for invalid input
+- **Dependencies:** All endpoints
+- **Blocked By:** None
+
+---
+
+### Task 13: Add CORS Configuration
+- **Status:** ⏳ NOT STARTED
+- **Priority:** LOW
+- **Estimated Time:** 1 hour
+- **Description:** Configure CORS for mobile app
+- **Requirements:**
+  - Allow requests from mobile app domain
+  - Allow credentials
+  - Allow necessary headers
 - **Dependencies:** None
 - **Blocked By:** None
 
 ---
 
-### Task 2: Implement Auth Endpoints
-- **Status:** ❌ NOT STARTED
-- **Priority:** CRITICAL (Blocks Task 3)
-- **Estimated Time:** 4-5 hours
-- **Assigned To:** TBD
-- **Description:** Create REST API endpoints for authentication
-- **Endpoints to Create:**
-  1. `POST /api/v1/auth/login` - User login
-  2. `POST /api/v1/auth/refresh` - Token refresh
-  3. `POST /api/v1/auth/logout` - User logout
-  4. `GET /api/v1/auth/me` - Get current user
-- **Files to Create/Update:**
-  - `server/_core/auth-api.ts` - NEW
-  - `server/_core/index.ts` - Update to mount endpoints
-- **Acceptance Criteria:**
-  - [ ] All 4 endpoints respond correctly
-  - [ ] JWT tokens are properly signed
-  - [ ] Invalid credentials return 401
-  - [ ] Expired tokens are rejected
-- **Dependencies:** Task 1
-- **Blocked By:** None
-
----
-
-### Task 3: Update Client Auth Flow
-- **Status:** ❌ NOT STARTED
-- **Priority:** CRITICAL (Blocks Task 4)
-- **Estimated Time:** 3-4 hours
-- **Assigned To:** TBD
-- **Description:** Update client to use new REST auth endpoints
-- **Files to Update:**
-  - `lib/_core/api.ts` - Add auth methods
-  - `lib/_core/auth.ts` - Update auth state
-  - `hooks/use-auth.ts` - Update auth hook
-- **Acceptance Criteria:**
-  - [ ] Client can login with credentials
-  - [ ] Client can refresh tokens
-  - [ ] Client can logout
-  - [ ] Tokens are stored securely
-- **Dependencies:** Task 2
-- **Blocked By:** None
-
----
-
-## 🟠 HIGH PRIORITY TASKS (Implement After Critical)
-
-### Task 4: Implement Sync Endpoints
-- **Status:** ❌ NOT STARTED
-- **Priority:** HIGH (Blocks Task 5)
-- **Estimated Time:** 4-5 hours
-- **Assigned To:** TBD
-- **Description:** Create REST API endpoints for work day synchronization
-- **Endpoints to Create:**
-  1. `POST /api/v1/sync/upload-workdays` - Upload work days
-  2. `GET /api/v1/sync/download-workdays` - Download work days
-  3. `GET /api/v1/sync/status` - Get sync status
-- **Files to Create/Update:**
-  - `server/_core/sync-api.ts` - NEW
-  - `server/_core/index.ts` - Update to mount endpoints
-- **Acceptance Criteria:**
-  - [ ] Client can upload work days
-  - [ ] Client can download work days
-  - [ ] Server validates authorization
-  - [ ] Data is persisted correctly
-- **Dependencies:** Task 2, Task 3
-- **Blocked By:** None
-
----
-
-### Task 5: Update Sync Service
-- **Status:** ❌ NOT STARTED
-- **Priority:** HIGH (Blocks Task 6)
-- **Estimated Time:** 3-4 hours
-- **Assigned To:** TBD
-- **Description:** Rewrite sync service to use REST API instead of tRPC
-- **Files to Update:**
-  - `lib/sync/syncService.ts` - Replace tRPC with REST API
-- **Acceptance Criteria:**
-  - [ ] Sync service uses REST API
-  - [ ] Offline queue works correctly
-  - [ ] Retry logic handles failures
-  - [ ] No TypeScript errors
-- **Dependencies:** Task 4
-- **Blocked By:** None
-
----
-
-### Task 6: Implement Admin Endpoints
-- **Status:** ❌ NOT STARTED
-- **Priority:** HIGH (Can be parallel with Task 4-5)
-- **Estimated Time:** 3-4 hours
-- **Assigned To:** TBD
-- **Description:** Create REST API endpoints for admin user and org management
-- **Endpoints to Create:**
-  1. `GET /api/v1/admin/users` - List users
-  2. `GET /api/v1/admin/org-units` - List org units
-  3. `GET /api/v1/admin/positions` - List positions
-  4. `POST /api/v1/admin/users/{id}/approve` - Approve user
-  5. `POST /api/v1/admin/users/{id}/reject` - Reject user
-- **Files to Create/Update:**
-  - `server/_core/admin-api.ts` - NEW
-  - `server/_core/index.ts` - Update to mount endpoints
-- **Acceptance Criteria:**
-  - [ ] Admin can list users
-  - [ ] Admin can approve/reject users
-  - [ ] Admin can view org structure
-  - [ ] Role-based access control works
-- **Dependencies:** Task 2
-- **Blocked By:** None
-
----
-
-## 🟡 MEDIUM PRIORITY TASKS (Implement After High)
-
-### Task 7: Add Input Validation
-- **Status:** ❌ NOT STARTED
-- **Priority:** MEDIUM
+### Task 14: Add API Documentation
+- **Status:** ⏳ NOT STARTED
+- **Priority:** LOW
 - **Estimated Time:** 2-3 hours
-- **Assigned To:** TBD
-- **Description:** Add request validation to all endpoints
-- **Files to Update:**
-  - `server/_core/auth-api.ts` - Add validation
-  - `server/_core/sync-api.ts` - Add validation
-  - `server/_core/admin-api.ts` - Add validation
-- **Acceptance Criteria:**
-  - [ ] Invalid requests return 400
-  - [ ] Error messages are helpful
-  - [ ] All fields are validated
-- **Dependencies:** Task 2, Task 4, Task 6
+- **Description:** Create OpenAPI/Swagger documentation
+- **Requirements:**
+  - Document all endpoints
+  - Document request/response schemas
+  - Document error codes
+- **Dependencies:** All endpoints
 - **Blocked By:** None
 
 ---
 
-### Task 8: Add Error Handling
-- **Status:** ❌ NOT STARTED
-- **Priority:** MEDIUM
+### Task 15: Performance Testing
+- **Status:** ⏳ NOT STARTED
+- **Priority:** LOW
 - **Estimated Time:** 2-3 hours
-- **Assigned To:** TBD
-- **Description:** Implement comprehensive error handling
-- **Files to Update:**
-  - `server/_core/auth-api.ts` - Add error handling
-  - `server/_core/sync-api.ts` - Add error handling
-  - `server/_core/admin-api.ts` - Add error handling
-- **Acceptance Criteria:**
-  - [ ] All errors return proper status codes
-  - [ ] Error messages are consistent
-  - [ ] Errors are logged properly
-- **Dependencies:** Task 2, Task 4, Task 6
+- **Description:** Test API performance and optimize
+- **Requirements:**
+  - Load test endpoints
+  - Measure response times
+  - Identify bottlenecks
+  - Optimize queries
+- **Dependencies:** All endpoints
 - **Blocked By:** None
 
 ---
 
-### Task 9: Add Logging
-- **Status:** ❌ NOT STARTED
-- **Priority:** MEDIUM
-- **Estimated Time:** 1-2 hours
-- **Assigned To:** TBD
-- **Description:** Add comprehensive logging for debugging
-- **Files to Update:**
-  - `server/_core/auth-api.ts` - Add logging
-  - `server/_core/sync-api.ts` - Add logging
-  - `server/_core/admin-api.ts` - Add logging
-- **Acceptance Criteria:**
-  - [ ] All important events are logged
-  - [ ] Logs include timestamps and context
-  - [ ] Sensitive data is not logged
-- **Dependencies:** Task 2, Task 4, Task 6
-- **Blocked By:** None
-
----
-
-## 🟢 TESTING TASKS
-
-### Task 10: Unit Tests for Auth
-- **Status:** ❌ NOT STARTED
-- **Priority:** HIGH
-- **Estimated Time:** 2-3 hours
-- **Assigned To:** TBD
-- **Description:** Write unit tests for auth endpoints
-- **Files to Create:**
-  - `tests/auth-api.test.ts` - NEW
-- **Acceptance Criteria:**
-  - [ ] All auth endpoints have tests
-  - [ ] Test coverage >80%
-  - [ ] All tests pass
-- **Dependencies:** Task 2
-- **Blocked By:** None
-
----
-
-### Task 11: Unit Tests for Sync
-- **Status:** ❌ NOT STARTED
-- **Priority:** HIGH
-- **Estimated Time:** 2-3 hours
-- **Assigned To:** TBD
-- **Description:** Write unit tests for sync endpoints
-- **Files to Create:**
-  - `tests/sync-api.test.ts` - NEW
-- **Acceptance Criteria:**
-  - [ ] All sync endpoints have tests
-  - [ ] Test coverage >80%
-  - [ ] All tests pass
-- **Dependencies:** Task 4
-- **Blocked By:** None
-
----
-
-### Task 12: Integration Tests
-- **Status:** ❌ NOT STARTED
-- **Priority:** HIGH
-- **Estimated Time:** 3-4 hours
-- **Assigned To:** TBD
-- **Description:** Write integration tests for full auth and sync flows
-- **Files to Create:**
-  - `tests/integration.test.ts` - NEW
-- **Test Scenarios:**
-  - [ ] User registration → approval → login
-  - [ ] Token refresh flow
-  - [ ] Work day upload → sync → download
-  - [ ] Offline sync when online
-- **Acceptance Criteria:**
-  - [ ] All scenarios pass
-  - [ ] No console errors
-  - [ ] Performance acceptable
-- **Dependencies:** Task 3, Task 5
-- **Blocked By:** None
-
----
-
-## 📚 DOCUMENTATION TASKS
-
-### Task 13: API Documentation
-- **Status:** ❌ NOT STARTED
-- **Priority:** MEDIUM
-- **Estimated Time:** 2-3 hours
-- **Assigned To:** TBD
-- **Description:** Document all REST API endpoints
-- **Files to Create:**
-  - `API_DOCUMENTATION.md` - NEW
-- **Acceptance Criteria:**
-  - [ ] All endpoints documented
-  - [ ] Request/response examples provided
-  - [ ] Error codes documented
-- **Dependencies:** Task 2, Task 4, Task 6
-- **Blocked By:** None
-
----
-
-### Task 14: User Manual
-- **Status:** ❌ NOT STARTED
-- **Priority:** MEDIUM
-- **Estimated Time:** 2-3 hours
-- **Assigned To:** TBD
-- **Description:** Write user manual for MVP features
-- **Files to Create:**
-  - `USER_MANUAL.md` - NEW
-- **Acceptance Criteria:**
-  - [ ] All features documented
-  - [ ] Screenshots provided
-  - [ ] Troubleshooting section included
-- **Dependencies:** All tasks
-- **Blocked By:** None
-
----
-
-### Task 15: Admin Manual
-- **Status:** ❌ NOT STARTED
-- **Priority:** MEDIUM
-- **Estimated Time:** 2-3 hours
-- **Assigned To:** TBD
-- **Description:** Write admin manual for user management
-- **Files to Create:**
-  - `ADMIN_MANUAL.md` - NEW
-- **Acceptance Criteria:**
-  - [ ] User management documented
-  - [ ] Org structure management documented
-  - [ ] Troubleshooting section included
-- **Dependencies:** Task 6
-- **Blocked By:** None
-
----
-
-## Task Dependencies Graph
+## 📊 Task Dependencies
 
 ```
-Task 1 (Fix TS Errors)
+Task 1 (TypeScript) ✅
     ↓
-Task 2 (Auth Endpoints)
+Task 2 (Auth Endpoints) ⏳
     ↓
-Task 3 (Auth Client)
-    ├─→ Task 6 (Admin Endpoints)
-    └─→ Task 4 (Sync Endpoints)
-            ↓
-        Task 5 (Sync Client)
-            ↓
-        Task 10-12 (Tests)
-            ↓
-        Task 13-15 (Documentation)
+├─→ Task 3 (Auth Flow Test) ⏳
+├─→ Task 4 (Admin Endpoints) ⏳
+├─→ Task 5 (Directory Endpoints) ⏳
+├─→ Task 6 (Sync Endpoints) ⏳
+├─→ Task 7 (Registration) ⏳
+├─→ Task 8 (Change Password) ⏳
+└─→ Task 9 (Forgot Password) ⏳
+
+Tasks 10-15 (Low Priority) - No dependencies
 ```
 
 ---
 
-## Implementation Schedule
+## 🎯 Completion Criteria for MVP
 
-### Week 1
-- **Day 1-2:** Task 1 (Fix TS Errors)
-- **Day 2-3:** Task 2 (Auth Endpoints)
-- **Day 3-4:** Task 3 (Auth Client)
-- **Day 4-5:** Task 6 (Admin Endpoints)
-
-### Week 2
-- **Day 1-2:** Task 4 (Sync Endpoints)
-- **Day 2-3:** Task 5 (Sync Client)
-- **Day 3-4:** Task 7-9 (Validation, Error Handling, Logging)
-- **Day 4-5:** Task 10-12 (Tests)
-
-### Week 3
-- **Day 1-2:** Task 13-15 (Documentation)
-- **Day 2-3:** Final testing and bug fixes
-- **Day 3-4:** Deployment preparation
-- **Day 4-5:** MVP Release
+- [x] TypeScript compilation: 0 errors
+- [ ] All Critical tasks completed (2, 3)
+- [ ] All High Priority tasks completed (4, 5, 6)
+- [ ] End-to-end auth flow working
+- [ ] End-to-end sync flow working
+- [ ] Admin can approve/reject users
+- [ ] Mobile app can login and sync data
+- [ ] No critical bugs in production
 
 ---
 
-## Resource Allocation
+## 📝 Notes
 
-| Role | Allocation | Tasks |
-|------|-----------|-------|
-| Backend Developer | 100% | Tasks 1, 2, 4, 6, 7, 8, 9 |
-| Frontend Developer | 100% | Tasks 3, 5 |
-| QA Engineer | 50% | Tasks 10, 11, 12 |
-| Technical Writer | 50% | Tasks 13, 14, 15 |
-
----
-
-## Risk Mitigation
-
-| Risk | Probability | Mitigation |
-|------|-------------|-----------|
-| Task 1 takes longer | Medium | Start immediately, have backup developer ready |
-| Database issues | Low | Test DB connection before starting Task 2 |
-| Token expiration edge cases | Medium | Comprehensive testing in Task 12 |
-| Performance issues | Low | Add caching and pagination in Task 7 |
-
----
-
-## Success Metrics
-
-- ✅ All 15 tasks completed
-- ✅ 0 TypeScript errors
-- ✅ >80% test coverage
-- ✅ All endpoints documented
-- ✅ User can login and track time
-- ✅ Admin can manage users
-- ✅ MVP deployed and accessible
+- Credentials for testing are in Task 2
+- All endpoints must use Bearer token authentication (except login, register, health)
+- All responses must follow the API contract defined in shared/api-types.ts
+- Database changes must be backward compatible
+- All code must pass TypeScript compilation
