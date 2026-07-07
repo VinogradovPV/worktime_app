@@ -22,10 +22,11 @@ export function useAuth(options?: UseAuthOptions) {
       // Web platform: use cookie-based auth, fetch user from API
       if (Platform.OS === "web") {
         console.log("[useAuth] Web platform: fetching user from API...");
-        const apiUser = await Api.getMe();
-        console.log("[useAuth] API user response:", apiUser);
+        const apiResponse = await Api.getMe();
+        console.log("[useAuth] API user response:", apiResponse);
 
-        if (apiUser) {
+        if (apiResponse && apiResponse.user) {
+          const apiUser = apiResponse.user;
           const userInfo: Auth.User = {
             id: apiUser.id,
             openId: apiUser.login || apiUser.id.toString(),
@@ -90,6 +91,7 @@ export function useAuth(options?: UseAuthOptions) {
       // Continue with logout even if API call fails
     } finally {
       await Auth.removeSessionToken();
+      await Auth.removeRefreshToken();
       await Auth.clearUserInfo();
       setUser(null);
       setError(null);

@@ -2,6 +2,8 @@ import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { SESSION_TOKEN_KEY, USER_INFO_KEY } from "@/constants/oauth";
 
+const REFRESH_TOKEN_KEY = "refresh_token";
+
 export type User = {
   id: number;
   openId: string;
@@ -127,5 +129,56 @@ export async function clearUserInfo(): Promise<void> {
     await SecureStore.deleteItemAsync(USER_INFO_KEY);
   } catch (error) {
     console.error("[Auth] Failed to clear user info:", error);
+  }
+}
+
+export async function getRefreshToken(): Promise<string | null> {
+  try {
+    if (Platform.OS === "web") {
+      console.log("[Auth] Web platform uses cookie-based auth, skipping refresh token retrieval");
+      return null;
+    }
+
+    console.log("[Auth] Getting refresh token...");
+    const token = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+    console.log(
+      "[Auth] Refresh token retrieved from SecureStore:",
+      token ? `present (${token.substring(0, 20)}...)` : "missing",
+    );
+    return token;
+  } catch (error) {
+    console.error("[Auth] Failed to get refresh token:", error);
+    return null;
+  }
+}
+
+export async function setRefreshToken(token: string): Promise<void> {
+  try {
+    if (Platform.OS === "web") {
+      console.log("[Auth] Web platform uses cookie-based auth, skipping refresh token storage");
+      return;
+    }
+
+    console.log("[Auth] Setting refresh token...", token.substring(0, 20) + "...");
+    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, token);
+    console.log("[Auth] Refresh token stored in SecureStore successfully");
+  } catch (error) {
+    console.error("[Auth] Failed to set refresh token:", error);
+    throw error;
+  }
+}
+
+export async function removeRefreshToken(): Promise<void> {
+  try {
+    if (Platform.OS === "web") {
+      console.log("[Auth] Web platform uses cookie-based auth, skipping refresh token removal");
+      return;
+    }
+
+    console.log("[Auth] Removing refresh token...");
+    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+    console.log("[Auth] Refresh token removed from SecureStore successfully");
+  } catch (error) {
+    console.error("[Auth] Failed to remove refresh token:", error);
   }
 }

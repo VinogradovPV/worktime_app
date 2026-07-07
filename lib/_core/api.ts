@@ -1,37 +1,36 @@
 import { Platform } from "react-native";
 import * as Auth from "./auth";
+import { getApiBaseUrl, API_ENDPOINTS } from "./api-config";
 
 type ApiResponse<T> = {
   data?: T;
   error?: string;
 };
 
-// External API configuration
-const EXTERNAL_API_BASE_URL = "https://worktimeapi.duckdns.org";
-const EXTERNAL_API_TOKEN = "6b7a58028382f9b59413cdea2a028ab17ac8545a9c5a43cf4e010c35a076e200";
-
+/**
+ * Основной метод для API запросов
+ * 
+ * ВАЖНО: Не использует hardcoded токены.
+ * Токен берется из Auth.getSessionToken() после login.
+ */
 export async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "Authorization": `Bearer ${EXTERNAL_API_TOKEN}`,
     ...((options.headers as Record<string, string>) || {}),
   };
 
-  // Add session token for native platform if available
-  if (Platform.OS !== "web") {
-    const sessionToken = await Auth.getSessionToken();
-    if (sessionToken) {
-      headers["Authorization"] = `Bearer ${sessionToken}`;
-      console.log("[API] Using session token for native platform");
-    }
+  // Добавить Authorization заголовок, если есть сохраненный токен
+  const sessionToken = await Auth.getSessionToken();
+  if (sessionToken) {
+    headers["Authorization"] = `Bearer ${sessionToken}`;
   }
 
-  const baseUrl = EXTERNAL_API_BASE_URL;
+  const baseUrl = getApiBaseUrl();
   const cleanBaseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const url = `${cleanBaseUrl}${cleanEndpoint}`;
   
-  console.log("[API] Making request to:", url);
+  console.log("[API] Запрос к:", url);
 
   try {
     const response = await fetch(url, {
@@ -40,218 +39,387 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
       credentials: "include",
     });
 
-    console.log("[API] Response status:", response.status, response.statusText);
+    console.log("[API] Статус ответа:", response.status, response.statusText);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[API] Error response:", errorText);
+      console.error("[API] Ошибка ответа:", errorText);
       let errorMessage = errorText;
       try {
         const errorJson = JSON.parse(errorText);
         errorMessage = errorJson.error || errorJson.message || errorText;
       } catch {
-        // Not JSON, use text as is
+        // Не JSON, используем текст как есть
       }
-      throw new Error(errorMessage || `API call failed: ${response.statusText}`);
+      throw new Error(errorMessage || `API запрос не удался: ${response.statusText}`);
     }
 
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
       const data = await response.json();
-      console.log("[API] JSON response received");
+      console.log("[API] JSON ответ получен");
       return data as T;
     }
 
     const text = await response.text();
-    console.log("[API] Text response received");
+    console.log("[API] Текстовый ответ получен");
     return (text ? JSON.parse(text) : {}) as T;
   } catch (error) {
-    console.error("[API] Request failed:", error);
+    console.error("[API] Запрос не удался:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error("Unknown error occurred");
+    throw new Error("Неизвестная ошибка");
   }
 }
 
 /**
- * Authentication API calls
+ * API вызовы для аутентификации
  */
 
-// Register new user
+/**
+ * Регистрация нового пользователя
+ * 
+ * Возвращает статус pending, не токен.
+ * Пользователь получит доступ только после подтверждения администратором.
+ */
 export async function register(data: {
   login: string;
   password: string;
+  passwordConfirm: string;
   displayName: string;
   orgUnitId: number;
   positionId: number;
-}): Promise<{ user: any; token: string }> {
-  return apiCall("/api/auth/register", {
+  comment?: string;
+}): Promise<{ ok: boolean; status: string; message: string }> {
+  return apiCall(API_ENDPOINTS.AUTH.REGISTER, {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
-// Login user
-export async function login(login: string, password: string): Promise<{ token: string; user: any }> {
-  const result = await apiCall<{ token: string; user: any }>("/api/auth/login", {
+/**
+ * Вход пользователя
+ * 
+ * Возвращает access_token и refresh_token.
+ * Токены сохраняются в SecureStore.
+ */
+export async function login(
+  login: string,
+  password: string,
+): Promise<{ ok: boolean; access_token: string; refresh_token: string; user: any }> {
+  const result = await apiCall<{
+    ok: boolean;
+    access_token: string;
+    refresh_token: string;
+    user: any;
+  }>(API_ENDPOINTS.AUTH.LOGIN, {
     method: "POST",
     body: JSON.stringify({ login, password }),
   });
-  
-  // Store session token
-  if (result.token) {
-    await Auth.setSessionToken(result.token);
+
+  // Сохранить токены
+  if (result.access_token) {
+    await Auth.setSessionToken(result.access_token);
   }
-  
+  if (result.refresh_token) {
+    await Auth.setRefreshToken(result.refresh_token);
+  }
+
   return result;
 }
 
-// Logout
+/**
+ * Обновление access token
+ * 
+ * Использует refresh_token для получения нового access_token.
+ */
+export async function refresh(refreshToken: string): Promise<{
+  ok: boolean;
+  access_token: string;
+  refresh_token: string;
+}> {
+  const result = await apiCall<{
+    ok: boolean;
+    access_token: string;
+    refresh_token: string;
+  }>(API_ENDPOINTS.AUTH.REFRESH, {
+    method: "POST",
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+
+  // Сохранить новые токены
+  if (result.access_token) {
+    await Auth.setSessionToken(result.access_token);
+  }
+  if (result.refresh_token) {
+    await Auth.setRefreshToken(result.refresh_token);
+  }
+
+  return result;
+}
+
+/**
+ * Выход пользователя
+ */
 export async function logout(): Promise<void> {
   try {
-    await apiCall<void>("/api/auth/logout", {
+    await apiCall<void>(API_ENDPOINTS.AUTH.LOGOUT, {
       method: "POST",
     });
   } finally {
     await Auth.removeSessionToken();
+    await Auth.removeRefreshToken();
   }
 }
 
-// Get current authenticated user
+/**
+ * Получить информацию о текущем пользователе
+ */
 export async function getMe(): Promise<{
-  id: number;
-  login: string;
-  displayName: string | null;
-  role: string;
-  status: string;
-  orgUnitId: number;
-  positionId: number;
+  ok: boolean;
+  user: {
+    id: number;
+    login: string;
+    displayName: string | null;
+    role: string;
+    status: string;
+    orgUnitId: number;
+    positionId: number;
+    managedOrgUnitId: number | null;
+  };
 } | null> {
   try {
-    const result = await apiCall<{ user: any }>("/api/auth/me");
-    return result.user || null;
+    const result = await apiCall<{
+      ok: boolean;
+      user: any;
+    }>(API_ENDPOINTS.AUTH.ME);
+    return result;
   } catch (error) {
-    console.error("[API] getMe failed:", error);
+    console.error("[API] getMe не удался:", error);
     return null;
   }
 }
 
-// Change password
-export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
-  await apiCall<void>("/api/auth/change-password", {
+/**
+ * Смена пароля
+ */
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ ok: boolean }> {
+  return apiCall(API_ENDPOINTS.AUTH.CHANGE_PASSWORD, {
     method: "POST",
     body: JSON.stringify({ currentPassword, newPassword }),
   });
 }
 
 /**
- * Admin API calls
+ * API вызовы для администратора
  */
 
-// Get all users
-export async function getUsers(): Promise<any[]> {
-  const result = await apiCall<{ users: any[] }>("/api/admin/users");
-  return result.users || [];
+/**
+ * Получить список заявок на регистрацию
+ */
+export async function getRegistrationRequests(): Promise<{
+  ok: boolean;
+  requests: any[];
+  total: number;
+}> {
+  return apiCall(API_ENDPOINTS.ADMIN.REGISTRATION_REQUESTS);
 }
 
-// Approve user registration
-export async function approveUser(userId: number): Promise<void> {
-  await apiCall<void>(`/api/admin/users/${userId}/approve`, {
-    method: "POST",
-  });
-}
-
-// Reject user registration
-export async function rejectUser(userId: number): Promise<void> {
-  await apiCall<void>(`/api/admin/users/${userId}/reject`, {
-    method: "POST",
-  });
-}
-
-// Block user
-export async function blockUser(userId: number): Promise<void> {
-  await apiCall<void>(`/api/admin/users/${userId}/block`, {
-    method: "POST",
-  });
-}
-
-// Unblock user
-export async function unblockUser(userId: number): Promise<void> {
-  await apiCall<void>(`/api/admin/users/${userId}/unblock`, {
-    method: "POST",
-  });
-}
-
-// Reset user password
-export async function resetPassword(userId: number): Promise<{ tempPassword: string }> {
-  return apiCall("/api/admin/users/{userId}/reset-password", {
-    method: "POST",
-  });
-}
-
-// Get organization units
-export async function getOrgUnits(): Promise<any[]> {
-  const result = await apiCall<{ orgUnits: any[] }>("/api/admin/org-units");
-  return result.orgUnits || [];
-}
-
-// Create organization unit
-export async function createOrgUnit(data: {
-  name: string;
-  shortName: string;
-  type: string;
-  parentId?: number;
-}): Promise<any> {
-  return apiCall("/api/admin/org-units", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-// Get positions
-export async function getPositions(): Promise<any[]> {
-  const result = await apiCall<{ positions: any[] }>("/api/admin/positions");
-  return result.positions || [];
-}
-
-// Create position
-export async function createPosition(data: {
-  name: string;
-  shortName: string;
-}): Promise<any> {
-  return apiCall("/api/admin/positions", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-// Get audit logs
-export async function getAuditLogs(filters?: {
-  userId?: number;
-  action?: string;
-  startDate?: string;
-  endDate?: string;
-}): Promise<any[]> {
+/**
+ * Получить всех пользователей
+ */
+export async function getUsers(filters?: {
+  role?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ ok: boolean; users: any[]; total: number }> {
   const params = new URLSearchParams();
-  if (filters?.userId) params.append("userId", String(filters.userId));
-  if (filters?.action) params.append("action", filters.action);
-  if (filters?.startDate) params.append("startDate", filters.startDate);
-  if (filters?.endDate) params.append("endDate", filters.endDate);
+  if (filters?.role) params.append("role", filters.role);
+  if (filters?.status) params.append("status", filters.status);
+  if (filters?.limit) params.append("limit", String(filters.limit));
+  if (filters?.offset) params.append("offset", String(filters.offset));
 
-  const result = await apiCall<{ logs: any[] }>(`/api/admin/audit-logs?${params.toString()}`);
-  return result.logs || [];
+  const endpoint = params.toString()
+    ? `${API_ENDPOINTS.ADMIN.USERS}?${params.toString()}`
+    : API_ENDPOINTS.ADMIN.USERS;
+
+  return apiCall(endpoint);
 }
 
-// Assign role to user
-export async function assignRole(userId: number, role: string): Promise<void> {
-  await apiCall<void>(`/api/admin/users/${userId}/assign-role`, {
+/**
+ * Подтвердить регистрацию пользователя и назначить роль
+ */
+export async function approveUser(userId: number, role: string): Promise<{
+  ok: boolean;
+  user: any;
+}> {
+  return apiCall(API_ENDPOINTS.ADMIN.USER_APPROVE(userId), {
     method: "POST",
     body: JSON.stringify({ role }),
   });
 }
 
-// OAuth callback handler - exchange code for session token
+/**
+ * Отклонить регистрацию пользователя
+ */
+export async function rejectUser(userId: number, reason?: string): Promise<{
+  ok: boolean;
+}> {
+  return apiCall(API_ENDPOINTS.ADMIN.USER_REJECT(userId), {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+/**
+ * Заблокировать пользователя
+ */
+export async function blockUser(userId: number): Promise<{ ok: boolean }> {
+  return apiCall(API_ENDPOINTS.ADMIN.USER_BLOCK(userId), {
+    method: "POST",
+  });
+}
+
+/**
+ * Разблокировать пользователя
+ */
+export async function unblockUser(userId: number): Promise<{ ok: boolean }> {
+  return apiCall(API_ENDPOINTS.ADMIN.USER_UNBLOCK(userId), {
+    method: "POST",
+  });
+}
+
+/**
+ * Сбросить пароль пользователя
+ * 
+ * ИСПРАВЛЕНО: Правильный URL с подстановкой userId
+ */
+export async function resetPassword(userId: number): Promise<{
+  ok: boolean;
+  tempPassword: string;
+}> {
+  return apiCall(API_ENDPOINTS.ADMIN.USER_RESET_PASSWORD(userId), {
+    method: "POST",
+  });
+}
+
+/**
+ * Назначить роль пользователю
+ */
+export async function assignRole(userId: number, role: string): Promise<{
+  ok: boolean;
+}> {
+  return apiCall(API_ENDPOINTS.ADMIN.USER_ASSIGN_ROLE(userId), {
+    method: "POST",
+    body: JSON.stringify({ role }),
+  });
+}
+
+/**
+ * API вызовы для справочников (публичные)
+ */
+
+/**
+ * Получить структурные подразделения
+ */
+export async function getOrgUnits(): Promise<{
+  ok: boolean;
+  orgUnits: any[];
+  total: number;
+}> {
+  return apiCall(API_ENDPOINTS.DIRECTORIES.ORG_UNITS);
+}
+
+/**
+ * Создать структурное подразделение (только для администратора)
+ */
+export async function createOrgUnit(data: {
+  name: string;
+  shortName: string;
+  type: string;
+  parentId?: number;
+}): Promise<{ ok: boolean; orgUnit: any }> {
+  return apiCall(API_ENDPOINTS.DIRECTORIES.ORG_UNITS, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Получить должности
+ */
+export async function getPositions(): Promise<{
+  ok: boolean;
+  positions: any[];
+  total: number;
+}> {
+  return apiCall(API_ENDPOINTS.DIRECTORIES.POSITIONS);
+}
+
+/**
+ * Создать должность (только для администратора)
+ */
+export async function createPosition(data: {
+  name: string;
+  shortName: string;
+}): Promise<{ ok: boolean; position: any }> {
+  return apiCall(API_ENDPOINTS.DIRECTORIES.POSITIONS, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * API вызовы для синхронизации
+ */
+
+/**
+ * Загрузить рабочие дни
+ */
+export async function uploadWorkDays(workdays: any[]): Promise<{
+  ok: boolean;
+  syncedCount: number;
+}> {
+  return apiCall(API_ENDPOINTS.SYNC.UPLOAD_WORKDAYS, {
+    method: "POST",
+    body: JSON.stringify({ workdays }),
+  });
+}
+
+/**
+ * Загрузить рабочие дни за период
+ */
+export async function downloadWorkDays(fromDate: string, toDate: string): Promise<{
+  ok: boolean;
+  workdays: any[];
+}> {
+  const params = new URLSearchParams({
+    from_date: fromDate,
+    to_date: toDate,
+  });
+
+  return apiCall(`${API_ENDPOINTS.SYNC.DOWNLOAD_WORKDAYS}?${params.toString()}`);
+}
+
+/**
+ * Получить статус синхронизации
+ */
+export async function getSyncStatus(): Promise<{
+  ok: boolean;
+  lastSyncAt: string;
+  pendingCount: number;
+}> {
+  return apiCall(API_ENDPOINTS.SYNC.STATUS);
+}
+
+/**
+ * OAuth callback handler - exchange code for session token
+ */
 export async function exchangeOAuthCode(
   code: string,
   state: string,
@@ -278,14 +446,13 @@ export async function exchangeOAuthCode(
   }
 }
 
-// Test API connection
+/**
+ * Проверить соединение с API
+ */
 export async function testConnection(): Promise<boolean> {
   try {
-    const response = await fetch(`${EXTERNAL_API_BASE_URL}/health`, {
-      headers: {
-        "Authorization": `Bearer ${EXTERNAL_API_TOKEN}`,
-      },
-    });
+    const baseUrl = getApiBaseUrl();
+    const response = await fetch(`${baseUrl}${API_ENDPOINTS.HEALTH}`);
     return response.ok;
   } catch {
     return false;
