@@ -381,26 +381,26 @@ export async function createPosition(data: {
 /**
  * Загрузить рабочие дни
  */
-export async function uploadWorkDays(workdays: any[]): Promise<{
+export async function uploadWorkDays(data: { workdays: any[] }): Promise<{
   ok: boolean;
-  syncedCount: number;
+  synced_count: number;
 }> {
   return apiCall(API_ENDPOINTS.SYNC.UPLOAD_WORKDAYS, {
     method: "POST",
-    body: JSON.stringify({ workdays }),
+    body: JSON.stringify(data),
   });
 }
 
 /**
  * Загрузить рабочие дни за период
  */
-export async function downloadWorkDays(fromDate: string, toDate: string): Promise<{
+export async function downloadWorkDays(data: { from_date: string; to_date: string }): Promise<{
   ok: boolean;
   workdays: any[];
 }> {
   const params = new URLSearchParams({
-    from_date: fromDate,
-    to_date: toDate,
+    from_date: data.from_date,
+    to_date: data.to_date,
   });
 
   return apiCall(`${API_ENDPOINTS.SYNC.DOWNLOAD_WORKDAYS}?${params.toString()}`);

@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { trpc } from "@/lib/trpc";
+import * as Api from "@/lib/_core/api";
 import { WorkDay } from "@/shared/types/workday";
 import { getAllWorkDays, saveWorkDay } from "@/lib/storage/workdayService";
 
@@ -90,11 +90,24 @@ class SyncService {
       );
 
       if (pendingChanges.length === 0) {
-        this.updateStatus({
-          isSyncing: false,
-          syncProgress: 100,
-          lastSyncTime: new Date(),
-        });
+        console.log("[Sync] No pending changes, checking sync status");
+        try {
+          // Check sync status from server
+          const statusResponse = await Api.getSyncStatus();
+          this.updateStatus({
+            isSyncing: false,
+            syncProgress: 100,
+            lastSyncTime: new Date(),
+            pendingChanges: statusResponse.pendingCount || 0,
+          });
+        } catch (err) {
+          console.warn("[Sync] Failed to check sync status:", err);
+          this.updateStatus({
+            isSyncing: false,
+            syncProgress: 100,
+            lastSyncTime: new Date(),
+          });
+        }
         await this.saveSyncStatus();
         return;
       }
@@ -102,47 +115,55 @@ class SyncService {
       this.updateStatus({ syncProgress: 20 });
 
       // Upload changes to server
-      const uploadResult = await (trpc.sync.uploadWorkDays as any).mutate({
-        workDays: pendingChanges.map((day: WorkDay) => ({
+      console.log("[Sync] Uploading", pendingChanges.length, "work days");
+      const uploadResult = await Api.uploadWorkDays({
+        workdays: pendingChanges.map((day: WorkDay) => ({
           date: day.date,
-          totalWorkedMs: day.totalWorkMs,
-          totalBreakMs: day.totalBreakMs,
-          totalTemporaryExitMs: day.totalTemporaryExitMs,
-          eventsJson: JSON.stringify(day.events),
-          version: 1,
+          status: day.status || "working",
+          hours: day.totalWorkMs ? day.totalWorkMs / (1000 * 60 * 60) : 0,
+          created_at: day.createdAt,
+          updated_at: day.updatedAt,
         })),
       });
 
+      console.log("[Sync] Upload result:", uploadResult);
       this.updateStatus({ syncProgress: 60 });
 
       // Download latest data from server
-      const downloadResult = await (trpc.sync.downloadWorkDays as any)({
-        since: lastSyncTime.toISOString(),
-      });
+      console.log("[Sync] Downloading work days since", lastSyncTime.toISOString());
+      const downloadResult = await Api.downloadWorkDays({
+        from_date: lastSyncTime.toISOString().split("T")[0],
+        to_date: new Date().toISOString().split("T")[0],
+      }) as any;
 
       this.updateStatus({ syncProgress: 80 });
 
       // Merge downloaded data with local
-      if (downloadResult.workDays && downloadResult.workDays.length > 0) {
-        for (const serverDay of downloadResult.workDays) {
+      if (downloadResult.workdays && downloadResult.workdays.length > 0) {
+        console.log("[Sync] Merging", downloadResult.workdays.length, "downloaded work days");
+        for (const serverDay of downloadResult.workdays) {
           const localDay = allWorkDays.find((d: WorkDay) => d.date === serverDay.date);
 
           if (!localDay) {
             // Server version is newer, use it
             await saveWorkDay({
               date: serverDay.date,
-              status: 'completed',
+              businessDate: serverDay.date,
+              status: serverDay.status || "working",
               workStartAt: null,
               workEndAt: null,
               breakIntervals: [],
               temporaryExitIntervals: [],
-              totalWorkMs: serverDay.totalWorkedMs,
-              totalBreakMs: serverDay.totalBreakMs,
-              totalTemporaryExitMs: serverDay.totalTemporaryExitMs,
+              totalWorkMs: (serverDay.hours || 0) * (1000 * 60 * 60),
+              totalBreakMs: 0,
+              totalTemporaryExitMs: 0,
               work95Ms: 0,
-              events: JSON.parse(serverDay.eventsJson),
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date(serverDay.updatedAt).toISOString(),
+              events: [],
+              crossesMidnight: false,
+              requires_review: false,
+              createdAt: serverDay.created_at || new Date().toISOString(),
+              updatedAt: serverDay.updated_at || new Date().toISOString(),
+              id: `${serverDay.date}-sync`,
             } as any);
           }
         }
@@ -161,10 +182,10 @@ class SyncService {
       await this.saveSyncStatus();
       await AsyncStorage.setItem(LAST_SYNC_TIME_KEY, newSyncTime.toISOString());
 
-      console.log("Sync completed successfully");
+      console.log("[Sync] Sync completed successfully");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      console.error("Sync failed:", errorMessage);
+      console.error("[Sync] Sync failed:", errorMessage);
       this.updateStatus({
         isSyncing: false,
         error: errorMessage,
