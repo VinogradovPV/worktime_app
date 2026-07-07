@@ -5,7 +5,12 @@
 **Total Tasks:** 15  
 **Completed:** 1  
 **In Progress:** 0  
-**Blocked:** 0
+**Blocked:** 0  
+**Critical Fixes Applied:**
+- ✅ Registration: No tokens returned, requires admin approval
+- ✅ Reset Password: Returns tempPassword, requires change on first login
+- ✅ All endpoints standardized to `/api/v1`
+- ✅ JWT: Access 15m, Refresh 7d (HS256)
 
 ---
 

@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Api from "@/lib/_core/api";
-import { WorkDay } from "@/shared/types/workday";
+import type { WorkDay } from "@/shared/types/workday";
 import { getAllWorkDays, saveWorkDay } from "@/lib/storage/workdayService";
 
 export interface SyncStatus {
@@ -134,12 +134,12 @@ class SyncService {
       const downloadResult = await Api.downloadWorkDays({
         from_date: lastSyncTime.toISOString().split("T")[0],
         to_date: new Date().toISOString().split("T")[0],
-      }) as any;
+      });
 
       this.updateStatus({ syncProgress: 80 });
 
       // Merge downloaded data with local
-      if (downloadResult.workdays && downloadResult.workdays.length > 0) {
+      if (downloadResult.ok && downloadResult.workdays && downloadResult.workdays.length > 0) {
         console.log("[Sync] Merging", downloadResult.workdays.length, "downloaded work days");
         for (const serverDay of downloadResult.workdays) {
           const localDay = allWorkDays.find((d: WorkDay) => d.date === serverDay.date);
