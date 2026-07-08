@@ -107,18 +107,25 @@ export async function register(data: {
 export async function login(
   login: string,
   password: string,
-): Promise<{ ok: boolean; access_token: string; refresh_token: string; user: any }> {
+): Promise<{
+  ok: boolean;
+  access_token: string;
+  refresh_token?: string;
+  requiresPasswordChange?: boolean;
+  user: any;
+}> {
   const result = await apiCall<{
     ok: boolean;
     access_token: string;
-    refresh_token: string;
+    refresh_token?: string;
+    requiresPasswordChange?: boolean;
     user: any;
   }>(API_ENDPOINTS.AUTH.LOGIN, {
     method: "POST",
     body: JSON.stringify({ login, password }),
   });
 
-  // Сохранить токены
+  // Сохранить токены (если требуется смена пароля, refresh_token может быть undefined)
   if (result.access_token) {
     await Auth.setSessionToken(result.access_token);
   }
