@@ -42,11 +42,15 @@
 
 #### 1.2 POST /api/v1/auth/login
 - **Request:** `{ login, password }`
-- **Response:** `{ ok: true, access_token, refresh_token, user }`
+- **Response (active):** `{ ok: true, access_token, refresh_token, user }`
+- **Response (password_reset_required):** `{ ok: true, requiresPasswordChange: true, access_token, user }`
 - **Логика:**
   - Проверить credentials в БД (bcrypt)
-  - Если статус != "active" → ошибка 401
-  - Выдать JWT токены (access: 15-30 мин, refresh: 7 дней)
+  - **Статус active:** Выдать полные JWT токены (access: 15-30 мин, refresh: 7 дней)
+  - **Статус password_reset_required:** Выдать access_token (ограниченный), requiresPasswordChange=true, НЕ выдавать refresh_token
+  - **Статус pending:** Вернуть 403 Forbidden (ожидание подтверждения admin)
+  - **Статус blocked:** Вернуть 403 Forbidden (пользователь заблокирован)
+  - **Статус rejected:** Вернуть 403 Forbidden (заявка отклонена)
   - Вернуть информацию о пользователе
 
 #### 1.3 POST /api/v1/auth/refresh
@@ -73,12 +77,19 @@
 
 #### 1.6 POST /api/v1/auth/change-password
 - **Request:** `{ current_password, new_password }`
-- **Response:** `{ ok: true }`
+- **Response:** `{ ok: true, access_token, refresh_token, user }`
 - **Логика:**
-  - Проверить текущий пароль
+  - Проверить текущий пароль (используя старый пароль)
   - Обновить пароль с bcrypt
   - Если status = "password_reset_required" → изменить на "active"
-  - Инвалидировать все существующие токены
+  - Выдать новые полные токены (access + refresh)
+  - Инвалидировать старые токены
+  - Вернуть обновленную информацию о пользователе
+
+**Ограничение доступа для password_reset_required:**
+- Пользователь с requiresPasswordChange=true может вызвать ТОЛЬКО POST /api/v1/auth/change-password
+- Все остальные endpoints должны проверить status и вернуть 403 если status != "active"
+- После успешной смены пароля status = "active" и доступ полностью восстанавливается
 
 ---
 
