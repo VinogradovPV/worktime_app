@@ -16,7 +16,10 @@
 - ✅ Административные функции с логированием
 - ✅ Аудит всех действий администратора
 
-**Backend Stack:** Express/TypeScript сервер в этом репозитории (server/_core/)
+**Backend Stack:** FastAPI сервер на Яндекс-сервере (/opt/worktime-sync/api/app/main.py)
+- PostgreSQL база данных (контейнер worktime-postgres)
+- Мобильный репозиторий: Expo React Native клиент (не backend)
+- Все API endpoints реализуются на FastAPI, не в мобильном приложении
 
 ---
 
