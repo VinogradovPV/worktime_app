@@ -9,45 +9,33 @@
 import Constants from "expo-constants";
 
 /**
+ * Production FastAPI backend URL
+ */
+const DEFAULT_API_BASE_URL = "https://worktimeapi.duckdns.org";
+
+/**
  * Получить base URL для API
  * 
  * Приоритет:
- * 1. Переменная окружения EXPO_PUBLIC_API_BASE_URL (для Expo)
- * 2. Переменная окружения REACT_APP_API_BASE_URL (для web)
- * 3. Значение по умолчанию для разработки
+ * 1. Constants.expoConfig?.extra?.apiBaseUrl (из app.config.ts extra)
+ * 2. process.env.EXPO_PUBLIC_API_BASE_URL (из .env)
+ * 3. DEFAULT_API_BASE_URL (production FastAPI backend)
+ * 
+ * ВАЖНО: Все API endpoints (auth, admin, directories, sync) идут на FastAPI backend.
  */
 export function getApiBaseUrl(): string {
-  // Для Expo приложения
+  // Для Expo приложения (из app.config.ts extra)
   if (Constants.expoConfig?.extra?.apiBaseUrl) {
     return Constants.expoConfig.extra.apiBaseUrl;
   }
 
-  // Для web приложения
-  if (typeof process !== "undefined" && process.env.REACT_APP_API_BASE_URL) {
-    return process.env.REACT_APP_API_BASE_URL;
+  // Для web приложения (из .env)
+  if (typeof process !== "undefined" && process.env.EXPO_PUBLIC_API_BASE_URL) {
+    return process.env.EXPO_PUBLIC_API_BASE_URL;
   }
 
-  // Значение по умолчанию для разработки (локальный сервер)
-  return "http://localhost:3000";
-}
-
-/**
- * Получить base URL для внешнего API (если нужен)
- * 
- * ВАЖНО: Используется только для справочников и публичных данных.
- * Для аутентификации используется локальный сервер.
- */
-export function getExternalApiBaseUrl(): string {
-  if (Constants.expoConfig?.extra?.externalApiBaseUrl) {
-    return Constants.expoConfig.extra.externalApiBaseUrl;
-  }
-
-  if (typeof process !== "undefined" && process.env.REACT_APP_EXTERNAL_API_BASE_URL) {
-    return process.env.REACT_APP_EXTERNAL_API_BASE_URL;
-  }
-
-  // Значение по умолчанию
-  return "https://worktimeapi.duckdns.org";
+  // Production: FastAPI backend на Яндекс-сервере
+  return DEFAULT_API_BASE_URL;
 }
 
 /**
