@@ -211,13 +211,21 @@ export async function getMe(): Promise<{
 /**
  * Смена пароля
  */
+/**
+ * Изменить пароль пользователя
+ * 
+ * Отправляет snake_case payload: { current_password, new_password }
+ */
 export async function changePassword(
   currentPassword: string,
   newPassword: string,
 ): Promise<{ ok: boolean }> {
   return apiCall(API_ENDPOINTS.AUTH.CHANGE_PASSWORD, {
     method: "POST",
-    body: JSON.stringify({ currentPassword, newPassword }),
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
   });
 }
 
