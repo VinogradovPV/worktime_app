@@ -210,9 +210,6 @@ export async function getMe(): Promise<{
 
 /**
  * Смена пароля
- */
-/**
- * Изменить пароль пользователя
  * 
  * Отправляет snake_case payload: { current_password, new_password }
  */
