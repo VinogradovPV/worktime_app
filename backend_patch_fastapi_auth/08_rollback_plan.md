@@ -1,381 +1,365 @@
-# Rollback Plan - Auth MVP Deployment
+# FastAPI Auth MVP - Rollback Plan
 
-**Date:** July 9, 2026  
-**Target:** Production FastAPI backend  
-**Scope:** Emergency rollback procedures
-
----
-
-## 🚨 When to Rollback
-
-Rollback if any of these occur:
-
-1. **API is not responding** after deployment
-2. **Database migration failed** and left database in inconsistent state
-3. **Authentication is broken** (login/register endpoints not working)
-4. **Data corruption** detected in users table
-5. **Performance degradation** (queries taking > 5 seconds)
-6. **Security vulnerability** discovered in auth code
-7. **Mobile app cannot connect** to backend
+**Date:** July 10, 2026  
+**Version:** 1.0  
+**Purpose:** Procedures to rollback deployment if issues occur
 
 ---
 
-## 📋 Pre-Rollback Checklist
+## 🔄 Rollback Scenarios
 
-Before executing rollback:
+### Scenario 1: Rollback Code Only (Database OK)
 
-- [ ] Identify the specific issue (check logs)
-- [ ] Notify users that service is degraded
-- [ ] Backup current database state (for post-mortem analysis)
-- [ ] Stop accepting new requests (if possible)
-- [ ] Prepare rollback commands
-
----
-
-## 🔄 Rollback Procedures
-
-### Option 1: Quick Rollback (Database + Code)
-
-**Time to execute:** 5-10 minutes  
-**Data loss:** None (using backup)  
-**Recommended:** For critical failures
+Use this if FastAPI code has issues but database is fine.
 
 ```bash
-#!/bin/bash
-set -e
-
 cd /opt/worktime-sync
 
-echo "=== Starting rollback procedure ==="
+# 1. Restore app files from backup
+BACKUP_DATE=20260710_123456  # Use actual date from backup
+rm -rf api/app
+cp -r api/app.backup_$BACKUP_DATE api/app
 
-# Step 1: Stop FastAPI container
-echo "Step 1: Stopping FastAPI container..."
-docker compose stop worktime-api
-sleep 2
-
-# Step 2: Restore database from backup
-echo "Step 2: Restoring database from backup..."
-LATEST_BACKUP=$(ls -t /backup/worktime_backup_*.sql | head -1)
-if [ -z "$LATEST_BACKUP" ]; then
-    echo "ERROR: No backup found in /backup/"
-    exit 1
-fi
-
-echo "Using backup: $LATEST_BACKUP"
-docker exec worktime-postgres psql -U worktime_user -d worktime < "$LATEST_BACKUP"
-
-# Step 3: Restore FastAPI code
-echo "Step 3: Restoring FastAPI code..."
-if [ -f "api/app/main.py.backup" ]; then
-    cp api/app/main.py.backup api/app/main.py
-    echo "Code restored from backup"
-else
-    echo "WARNING: No code backup found, using git to revert"
-    cd api/app
-    git checkout main.py
-    cd ../../
-fi
-
-# Step 4: Restart containers
-echo "Step 4: Restarting containers..."
-docker compose restart worktime-api
-docker compose restart worktime-postgres
-
-# Step 5: Verify rollback
-echo "Step 5: Verifying rollback..."
-sleep 5
-curl -s https://worktimeapi.duckdns.org/api/v1/health || echo "Health check failed"
-
-echo "=== Rollback complete ==="
-```
-
-### Option 2: Database-Only Rollback
-
-**Time to execute:** 3-5 minutes  
-**Data loss:** None  
-**Use case:** If only database migration failed, FastAPI code is fine
-
-```bash
-#!/bin/bash
-set -e
-
-cd /opt/worktime-sync
-
-echo "=== Database-only rollback ==="
-
-# Stop FastAPI to prevent connections during restore
-docker compose stop worktime-api
-
-# Find latest backup
-LATEST_BACKUP=$(ls -t /backup/worktime_backup_*.sql | head -1)
-echo "Restoring from: $LATEST_BACKUP"
-
-# Restore database
-docker exec worktime-postgres psql -U worktime_user -d worktime < "$LATEST_BACKUP"
-
-# Restart FastAPI
+# 2. Restart container
 docker compose restart worktime-api
 
-echo "=== Database rollback complete ==="
-```
+# 3. Wait for startup
+sleep 10
 
-### Option 3: Code-Only Rollback
-
-**Time to execute:** 2-3 minutes  
-**Data loss:** None  
-**Use case:** If FastAPI code has bugs but database is fine
-
-```bash
-#!/bin/bash
-set -e
-
-cd /opt/worktime-sync
-
-echo "=== Code-only rollback ==="
-
-# Restore code from backup
-if [ -f "api/app/main.py.backup" ]; then
-    cp api/app/main.py.backup api/app/main.py
-    echo "Code restored from backup"
-else
-    # Or use git to revert to previous commit
-    cd api/app
-    git log --oneline -5
-    git checkout HEAD~1 main.py
-    cd ../../
-    echo "Code reverted to previous git commit"
-fi
-
-# Restart FastAPI
-docker compose restart worktime-api
-
-# Verify
-sleep 3
+# 4. Verify
 curl -s https://worktimeapi.duckdns.org/api/v1/health
-
-echo "=== Code rollback complete ==="
+docker logs worktime-api | tail -20
 ```
 
-### Option 4: Manual Rollback (Step-by-Step)
+### Scenario 2: Rollback Database Only (Code OK)
 
-**Time to execute:** 10-15 minutes  
-**Use case:** If automated scripts fail
+Use this if database migration has issues but code is fine.
 
 ```bash
-# Step 1: Check current status
-docker ps
-docker logs worktime-api | tail -20
-
-# Step 2: Stop containers
-docker compose stop worktime-api
-
-# Step 3: Restore database
-# Find backup file
-ls -lh /backup/worktime_backup_*.sql
-
-# Restore specific backup
-docker exec worktime-postgres psql -U worktime_user -d worktime < /backup/worktime_backup_20260709_120000.sql
-
-# Step 4: Restore code
-cd /opt/worktime-sync/api/app
-ls -la main.py*
-cp main.py.backup main.py
-
-# Step 5: Restart
 cd /opt/worktime-sync
+
+# 1. Restore database from backup
+BACKUP_DATE=20260710_123456  # Use actual date from backup
+docker exec worktime-postgres psql -U worktime_user -d worktime < worktime_backup_$BACKUP_DATE.sql
+
+# 2. Verify database restored
+docker exec worktime-postgres psql -U worktime_user -d worktime -c "SELECT COUNT(*) FROM users;"
+
+# 3. Restart container (to reconnect to database)
 docker compose restart worktime-api
 
-# Step 6: Verify
-docker logs worktime-api | tail -20
-curl https://worktimeapi.duckdns.org/api/v1/health
+# 4. Verify
+curl -s https://worktimeapi.duckdns.org/api/v1/health
+```
+
+### Scenario 3: Rollback Both Code and Database
+
+Use this if both code and database have issues.
+
+```bash
+cd /opt/worktime-sync
+
+# 1. Restore app files
+BACKUP_DATE=20260710_123456  # Use actual date from backup
+rm -rf api/app
+cp -r api/app.backup_$BACKUP_DATE api/app
+
+# 2. Restore database
+docker exec worktime-postgres psql -U worktime_user -d worktime < worktime_backup_$BACKUP_DATE.sql
+
+# 3. Restart container
+docker compose restart worktime-api
+
+# 4. Wait for startup
+sleep 10
+
+# 5. Verify
+curl -s https://worktimeapi.duckdns.org/api/v1/health
+docker logs worktime-api | tail -30
+
+# 6. Verify database
+docker exec worktime-postgres psql -U worktime_user -d worktime -c "SELECT COUNT(*) FROM users;"
+```
+
+### Scenario 4: Partial Database Rollback (Undo Migration Only)
+
+Use this if migration needs to be undone but app files are OK.
+
+```bash
+cd /opt/worktime-sync
+
+# 1. Drop new tables created by migration
+docker exec worktime-postgres psql -U worktime_user -d worktime << 'SQL'
+DROP TABLE IF EXISTS refresh_tokens CASCADE;
+DROP TABLE IF EXISTS audit_logs CASCADE;
+DROP TABLE IF EXISTS positions CASCADE;
+DROP TABLE IF EXISTS org_units CASCADE;
+-- Do NOT drop users table if it existed before
+SQL
+
+# 2. Verify tables dropped
+docker exec worktime-postgres psql -U worktime_user -d worktime -c "\dt"
+
+# 3. Restart container
+docker compose restart worktime-api
+
+# 4. Verify
+curl -s https://worktimeapi.duckdns.org/api/v1/health
 ```
 
 ---
 
 ## ✅ Post-Rollback Verification
 
-After executing rollback, verify:
+After any rollback, verify:
+
+### 1. Container Status
 
 ```bash
-# 1. Check containers are running
-docker ps | grep worktime
+# Check if container is running
+docker ps | grep worktime-api
+# Expected: worktime-api container should be Up
 
-# 2. Check logs for errors
-docker logs worktime-api | tail -20
-docker logs worktime-postgres | tail -20
+# Check logs for errors
+docker logs worktime-api | tail -30
+# Expected: No critical errors, should see "Uvicorn running"
+```
 
-# 3. Test database connection
+### 2. Health Endpoint
+
+```bash
+# Test health endpoint
+curl -s https://worktimeapi.duckdns.org/api/v1/health | jq .
+# Expected: {"status":"ok"}
+```
+
+### 3. Database Connection
+
+```bash
+# Test database connection
+docker exec worktime-api python -c "from app.dependencies.database import SessionLocal; db = SessionLocal(); print('Database connected')"
+# Expected: "Database connected"
+
+# Or test directly
+docker exec worktime-postgres psql -U worktime_user -d worktime -c "SELECT 1"
+# Expected: 1
+```
+
+### 4. API Endpoints
+
+```bash
+# Test public endpoint
+curl -s https://worktimeapi.duckdns.org/api/v1/directories/org-units | jq .
+# Expected: JSON array of org units
+
+# Test auth endpoint
+curl -s -X POST https://worktimeapi.duckdns.org/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"admin","password":"AdminPassword123!"}' | jq .
+# Expected: access_token and refresh_token (or error if user doesn't exist)
+```
+
+### 5. Database Tables
+
+```bash
+# Check tables exist
+docker exec worktime-postgres psql -U worktime_user -d worktime -c "\dt"
+
+# Check users table
+docker exec worktime-postgres psql -U worktime_user -d worktime -c "\d users"
+
+# Count users
 docker exec worktime-postgres psql -U worktime_user -d worktime -c "SELECT COUNT(*) FROM users;"
+```
 
-# 4. Test API endpoints
+---
+
+## 🚨 Emergency Rollback (Full System Reset)
+
+Use this only if normal rollback doesn't work.
+
+```bash
+cd /opt/worktime-sync
+
+# 1. Stop all containers
+docker compose down
+
+# 2. Restore app files
+BACKUP_DATE=20260710_123456  # Use actual date from backup
+rm -rf api/app
+cp -r api/app.backup_$BACKUP_DATE api/app
+
+# 3. Restore database
+docker exec worktime-postgres psql -U worktime_user -d worktime < worktime_backup_$BACKUP_DATE.sql
+
+# 4. Start containers
+docker compose up -d
+
+# 5. Wait for startup
+sleep 15
+
+# 6. Verify all services
+docker compose ps
 curl -s https://worktimeapi.duckdns.org/api/v1/health
-curl -s https://worktimeapi.duckdns.org/api/v1/directories/org-units
-
-# 5. Check audit logs for rollback action
-docker exec worktime-postgres psql -U worktime_user -d worktime -c "SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 5;"
-
-# 6. Notify users that service is restored
-echo "Service restored successfully"
 ```
 
 ---
 
-## 📊 Rollback Scenarios
+## 📋 Rollback Decision Tree
 
-### Scenario 1: Migration Failed (Database Inconsistent)
+Use this to decide which rollback scenario to use:
 
-**Symptoms:**
-- `ERROR: relation "users" does not exist`
-- `ERROR: column "password_hash" does not exist`
-- Database queries failing
-
-**Solution:**
-```bash
-# Use Option 2: Database-only rollback
-docker compose stop worktime-api
-docker exec worktime-postgres psql -U worktime_user -d worktime < /backup/worktime_backup_latest.sql
-docker compose restart worktime-api
 ```
-
-### Scenario 2: FastAPI Won't Start
-
-**Symptoms:**
-- `docker logs worktime-api` shows Python errors
-- Container exits immediately after restart
-- API not responding
-
-**Solution:**
-```bash
-# Use Option 3: Code-only rollback
-cp /opt/worktime-sync/api/app/main.py.backup /opt/worktime-sync/api/app/main.py
-docker compose restart worktime-api
-```
-
-### Scenario 3: Authentication Broken
-
-**Symptoms:**
-- Login endpoint returns 500 error
-- Register endpoint fails
-- Mobile app cannot authenticate
-
-**Solution:**
-```bash
-# Check logs for specific error
-docker logs worktime-api | grep -i "auth\|error"
-
-# If code issue: Use Option 3 (code-only rollback)
-# If database issue: Use Option 2 (database-only rollback)
-# If both: Use Option 1 (full rollback)
-```
-
-### Scenario 4: Data Corruption
-
-**Symptoms:**
-- Users table has corrupted data
-- Audit logs show unexpected changes
-- Queries return wrong results
-
-**Solution:**
-```bash
-# Use Option 1: Full rollback
-# This will restore database from backup, losing any changes made after backup
-
-# After rollback, investigate what caused corruption
-docker exec worktime-postgres psql -U worktime_user -d worktime -c "SELECT * FROM audit_logs WHERE created_at > NOW() - INTERVAL '1 hour';"
-```
-
-### Scenario 5: Performance Degradation
-
-**Symptoms:**
-- Queries taking > 5 seconds
-- High CPU/memory usage
-- Timeouts on API endpoints
-
-**Solution:**
-```bash
-# Check for missing indexes
-docker exec worktime-postgres psql -U worktime_user -d worktime -c "\d+ users"
-
-# If indexes missing: Re-apply migration
-docker exec worktime-postgres psql -U worktime_user -d worktime -f backend_patch_fastapi_auth/01_migration_auth_mvp.sql
-
-# If still slow: Use Option 1 (full rollback)
+Is the API responding?
+├─ NO → Scenario 3: Rollback Both
+└─ YES
+   ├─ Are endpoints returning correct data?
+   │  ├─ NO (wrong schema, missing fields) → Scenario 1: Rollback Code Only
+   │  └─ YES
+   │     ├─ Are database tables correct?
+   │     │  ├─ NO (tables missing, wrong structure) → Scenario 2: Rollback Database Only
+   │     │  └─ YES → No rollback needed, debug issue
+   │     └─ Are there database errors?
+   │        ├─ YES → Scenario 2: Rollback Database Only
+   │        └─ NO → Debug application code
 ```
 
 ---
 
-## 🔍 Post-Rollback Analysis
+## 🔍 Debugging Before Rollback
 
-After successful rollback, investigate root cause:
+Before rolling back, check these things:
+
+### 1. Check Application Logs
 
 ```bash
-# 1. Check deployment logs
-cat /opt/worktime-sync/logs/deployment_*.log
+docker logs worktime-api | tail -50
+# Look for: error, exception, traceback
+```
 
-# 2. Check FastAPI error logs
-docker logs worktime-api > /tmp/api_logs_rollback.txt
+### 2. Check Database Logs
 
-# 3. Check database logs
-docker logs worktime-postgres > /tmp/db_logs_rollback.txt
+```bash
+docker logs worktime-postgres | tail -50
+# Look for: error, connection refused, permission denied
+```
 
-# 4. Review audit logs for suspicious activity
-docker exec worktime-postgres psql -U worktime_user -d worktime -c "SELECT * FROM audit_logs WHERE created_at > NOW() - INTERVAL '1 hour' ORDER BY created_at DESC;" > /tmp/audit_logs_rollback.txt
+### 3. Check Environment Variables
 
-# 5. Compare database schema before/after
-docker exec worktime-postgres pg_dump -U worktime_user -d worktime --schema-only > /tmp/schema_after_rollback.sql
-diff /backup/worktime_schema_before_auth_patch.sql /tmp/schema_after_rollback.sql > /tmp/schema_diff.txt
+```bash
+docker compose config | grep -E "JWT_SECRET|DATABASE_URL|ENABLE_ADMIN"
+# Verify all required variables are set
+```
 
-# 6. Document findings
-cat > /tmp/rollback_analysis.md << EOF
-# Rollback Analysis
+### 4. Test Database Connection
 
-## Issue
-[Describe what went wrong]
+```bash
+docker exec worktime-api python << 'PYEOF'
+import os
+from sqlalchemy import create_engine
 
-## Root Cause
-[Explain why it happened]
+db_url = os.getenv("DATABASE_URL")
+print(f"Database URL: {db_url}")
 
-## Solution
-[What needs to be fixed]
+try:
+    engine = create_engine(db_url)
+    with engine.connect() as conn:
+        result = conn.execute("SELECT 1")
+        print("Database connection: OK")
+except Exception as e:
+    print(f"Database connection error: {e}")
+PYEOF
+```
 
-## Prevention
-[How to prevent in future]
-EOF
+### 5. Check API Response
+
+```bash
+# Test with verbose output
+curl -v https://worktimeapi.duckdns.org/api/v1/health
+
+# Test with detailed error
+curl -s -X GET https://worktimeapi.duckdns.org/api/v1/auth/me \
+  -H "Authorization: Bearer invalid_token" | jq .
 ```
 
 ---
 
-## 📞 Escalation
+## 📊 Backup Verification
 
-If rollback doesn't resolve the issue:
+Before rolling back, verify backups are valid:
 
-1. **Contact FastAPI development team**
-   - Provide: `/tmp/api_logs_rollback.txt`
-   - Provide: `/tmp/rollback_analysis.md`
+### 1. Verify App Backup
 
-2. **Contact database team**
-   - Provide: `/tmp/db_logs_rollback.txt`
-   - Provide: `/tmp/schema_diff.txt`
+```bash
+# Check backup directory exists
+ls -la api/app.backup_*
 
-3. **Escalate to infrastructure team**
-   - Provide: All logs and analysis files
-   - Request: Full system diagnostics
+# Check backup has files
+find api/app.backup_20260710_123456 -name "*.py" | wc -l
+# Expected: > 20 files
+```
+
+### 2. Verify Database Backup
+
+```bash
+# Check backup file exists and has size
+ls -lh worktime_backup_20260710_123456.sql
+# Expected: file size > 1MB
+
+# Check backup is valid SQL
+head -20 worktime_backup_20260710_123456.sql
+# Expected: SQL comments and CREATE TABLE statements
+
+# Verify backup is not corrupted
+tail -10 worktime_backup_20260710_123456.sql
+# Expected: Should end with "COMMIT;" or similar
+```
 
 ---
 
-## 🛡️ Prevention
+## 🔄 Rollback Procedure Checklist
 
-To prevent needing rollback:
-
-1. **Always create backups before deployment**
-2. **Test on staging environment first**
-3. **Have rollback plan documented and tested**
-4. **Monitor logs during and after deployment**
-5. **Have team on standby during deployment**
-6. **Use gradual rollout (if possible)**
-7. **Have automated health checks**
+- [ ] Identified which rollback scenario to use
+- [ ] Located correct backup files (app and/or database)
+- [ ] Verified backup files are valid
+- [ ] Stopped or restarted containers as needed
+- [ ] Restored files from backup
+- [ ] Restarted containers
+- [ ] Waited for startup (10-15 seconds)
+- [ ] Verified health endpoint
+- [ ] Verified database connection
+- [ ] Verified API endpoints
+- [ ] Checked logs for errors
+- [ ] Documented what went wrong
+- [ ] Notified team
 
 ---
 
-**Last Updated:** July 9, 2026  
+## 📞 Support
+
+If rollback doesn't work:
+
+1. Check logs: `docker logs worktime-api`
+2. Check database: `docker logs worktime-postgres`
+3. Verify backups exist: `ls -la api/app.backup_*`
+4. Try emergency rollback (full system reset)
+5. Contact system administrator
+
+---
+
+## 🎯 Prevention
+
+To avoid needing rollback:
+
+1. **Test in staging first** - Apply changes to staging environment
+2. **Create backups** - Always backup before deployment
+3. **Verify backups** - Test restore procedure before production
+4. **Gradual rollout** - Deploy to small subset first
+5. **Monitor logs** - Watch logs during and after deployment
+6. **Have runbook** - Document all deployment steps
+7. **Team communication** - Notify team before deployment
+
+---
+
+**Last Updated:** July 10, 2026  
 **Status:** Ready for emergency use

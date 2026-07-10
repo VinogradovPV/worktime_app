@@ -1,318 +1,310 @@
-# Security Checklist - Auth MVP Deployment
+# FastAPI Auth MVP - Security Checklist
 
-**Date:** July 9, 2026  
-**Target:** Production FastAPI backend  
-**Scope:** Auth endpoints security requirements
+**Date:** July 10, 2026  
+**Version:** 2.0  
+**Purpose:** Comprehensive security requirements for FastAPI Auth MVP deployment
 
 ---
 
-## 🔐 Pre-Deployment Security Checklist
+## 🔐 Critical Security Requirements
 
-### Environment Variables & Secrets
+### 1. API Token Management
 
-- [ ] **JWT_SECRET_KEY** is set to random string (min 32 characters)
-  - Generate: `openssl rand -hex 32`
-  - Store in: Docker secrets or .env (not in git)
-  - Verify: `echo $JWT_SECRET_KEY | wc -c` should be > 32
+- [ ] **Old exposed API token must be rotated**
+  - Identify all services using old `EXTERNAL_API_TOKEN`
+  - Generate new token: `openssl rand -hex 32`
+  - Update all services simultaneously
+  - Verify old token no longer works
+  - Document rotation date/time
+  - Audit log token changes
 
-- [ ] **ADMIN_SEED_TOKEN** is set to random string (min 32 characters)
-  - Generate: `openssl rand -hex 32`
-  - Store in: Docker secrets or .env (not in git)
-  - Verify: Only used during initial admin setup
+- [ ] **Verify no old tokens in git history**
+  ```bash
+  git log --all --source --full-history -S "EXTERNAL_API_TOKEN" -- .
+  git log --all --source --full-history -S "old_token_value" -- .
+  # Should return nothing
+  ```
 
-- [ ] **DATABASE_URL** contains correct credentials
-  - Format: `postgresql://user:password@host:port/database`
-  - Password is NOT committed to git
-  - Connection uses SSL/TLS if possible
+### 2. Seed Endpoint Security
 
-- [ ] **API_BASE_URL** is set to production domain
-  - Value: `https://worktimeapi.duckdns.org`
-  - NOT `http://localhost:3000`
-  - NOT `http://` (must be HTTPS)
+- [ ] **Seed endpoint is protected by token**
+  - Header: `X-Admin-Token` required
+  - Token is 32+ hex characters
+  - Token is NOT hardcoded in code
+  - Token is NOT committed to git
 
-- [ ] No secrets are logged
-  - Check: `grep -r "JWT_SECRET\|ADMIN_SEED\|password" /opt/worktime-sync/api/app/ --include="*.py" | grep -v "# TODO"`
-  - Result: Should be empty or only comments
-
-### Database Security
-
-- [ ] PostgreSQL user has minimal required permissions
-  - User: `worktime_user`
-  - Permissions: SELECT, INSERT, UPDATE, DELETE on worktime database only
-  - Verify: `docker exec worktime-postgres psql -U worktime_user -d worktime -c "\du"`
-
-- [ ] Database backups are encrypted
-  - Backup location: `/backup/` with restricted permissions
-  - Permissions: `chmod 600 /backup/worktime_backup_*.sql`
-  - Verify: `ls -l /backup/worktime_backup_*.sql`
-
-- [ ] Database connections use SSL/TLS
-  - Check: `grep -i "ssl\|tls" /opt/worktime-sync/docker-compose.yml`
-  - Or: `echo $DATABASE_URL | grep -i "ssl"`
-
-### Password Security
-
-- [ ] Passwords are hashed with bcryptjs (not plain text)
-  - Check: `grep -r "bcryptjs\|bcrypt" /opt/worktime-sync/api/app/routers/auth.py`
-  - Verify: No plain text passwords in database
-
-- [ ] Password requirements enforced
-  - Minimum length: 8 characters
-  - Check: `grep -A 5 "password_strength" /opt/worktime-sync/api/app/routers/auth.py`
-
-- [ ] Temporary passwords (after reset) are:
-  - Generated securely (random, not predictable)
-  - Hashed before storage
-  - Returned only once in response
-  - NOT logged in audit_logs
-
-### JWT Security
-
-- [ ] JWT tokens use HTTPS only
-  - Check: API_BASE_URL must be `https://`
-  - Verify: `curl -I https://worktimeapi.duckdns.org/api/v1/auth/me`
-
-- [ ] JWT tokens have expiration
-  - Access token: 30 minutes
-  - Refresh token: 7 days
-  - Check: `grep "EXPIRE" /opt/worktime-sync/docker-compose.yml`
-
-- [ ] JWT algorithm is HS256 (not RS256 without proper key management)
-  - Check: `grep "JWT_ALGORITHM" /opt/worktime-sync/docker-compose.yml`
-  - Value should be: `HS256`
-
-- [ ] Refresh tokens are stored server-side
-  - Table: `refresh_tokens`
-  - Verify: `docker exec worktime-postgres psql -U worktime_user -d worktime -c "\d refresh_tokens"`
-
-- [ ] Refresh tokens can be revoked
-  - Logout endpoint invalidates refresh tokens
-  - Check: `grep -A 10 "def logout" /opt/worktime-sync/api/app/routers/auth.py`
-
-### API Security
-
-- [ ] CORS is properly configured
-  - Allowed origins: Only `https://worktimeapp-pdfmhwoz.manus.space` (mobile app domain)
-  - Check: `grep -i "cors\|allow_origins" /opt/worktime-sync/api/app/main.py`
-
-- [ ] Rate limiting is enabled
-  - Prevent brute force attacks on login endpoint
-  - Check: `grep -i "rate_limit\|slowapi" /opt/worktime-sync/api/app/routers/auth.py`
-
-- [ ] Input validation is enforced
-  - Email format validation (if applicable)
-  - Password confirmation matching
-  - Check: `grep -A 5 "@validator" /opt/worktime-sync/api/app/routers/auth.py`
-
-- [ ] SQL injection prevention
-  - Use parameterized queries (SQLAlchemy ORM)
-  - Check: No raw SQL strings in auth.py
-  - Verify: `grep -i "execute\|raw" /opt/worktime-sync/api/app/routers/auth.py | grep -v "#"`
-
-- [ ] XSS prevention
-  - Return JSON, not HTML
-  - Check: `grep -i "html\|template" /opt/worktime-sync/api/app/routers/auth.py`
-
-### Audit Logging
-
-- [ ] All auth actions are logged
-  - register, login, logout, change-password, reset-password
-  - Check: `grep -i "audit_log\|AuditLog" /opt/worktime-sync/api/app/routers/auth.py`
-
-- [ ] Audit logs do NOT contain sensitive data
-  - NO passwords (plain or hashed)
-  - NO tokens
-  - NO temporary passwords
-  - Check: `grep -i "password\|token" /opt/worktime-sync/api/app/routers/auth.py | grep -i "audit"`
-
-- [ ] Audit logs include timestamp and user
-  - actor_user_id, action, created_at
-  - Check: `docker exec worktime-postgres psql -U worktime_user -d worktime -c "SELECT * FROM audit_logs LIMIT 1;"`
-
-### Admin Seed Endpoint
-
-- [ ] Admin seed endpoint is disabled after first admin created
+- [ ] **Seed endpoint must be disabled after bootstrap**
   - Set: `ENABLE_ADMIN_SEED_ENDPOINT=false`
-  - Verify: `docker exec worktime-api env | grep ENABLE_ADMIN_SEED`
+  - Restart container: `docker compose restart worktime-api`
+  - Verify endpoint returns 403:
+    ```bash
+    curl -X POST https://worktimeapi.duckdns.org/api/v1/internal/seed-admins \
+      -H "X-Admin-Token: any_token" \
+      -d '{"login":"test","password":"Test123!","displayName":"Test"}'
+    # Expected: {"ok":false,"error":"Admin seed endpoint is disabled"}
+    ```
 
-- [ ] Admin seed endpoint requires token
-  - Header: `X-Admin-Token: <ADMIN_SEED_TOKEN>`
-  - Check: `grep -A 5 "X-Admin-Token" /opt/worktime-sync/api/app/routers/admin.py`
+- [ ] **Verify active admin users exist before disabling**
+  ```bash
+  docker exec worktime-postgres psql -U worktime_user -d worktime -c \
+    "SELECT COUNT(*) FROM users WHERE role='admin' AND status='active';"
+  # Expected: >= 1
+  ```
 
-- [ ] Admin seed endpoint is not documented in public API
-  - Path: `/api/v1/internal/seed-admins` (internal, not public)
-  - Check: `grep -i "seed" /opt/worktime-sync/api/app/main.py`
+- [ ] **Seed endpoint is NOT accessible from mobile app**
+  - Mobile app does NOT have seed token
+  - Mobile app does NOT call `/api/v1/internal/seed-admins`
+  - Only server-side bootstrap uses this endpoint
 
-### HTTPS & TLS
+### 3. Database Security
 
-- [ ] HTTPS is enforced (no HTTP)
-  - Check: `grep -i "http://" /opt/worktime-sync/docker-compose.yml`
-  - Result: Should be empty or only in comments
+- [ ] **Database password stays ONLY in server environment**
+  - NOT in git repository
+  - NOT in code
+  - NOT in documentation
+  - Stored in: `.env` file (NOT committed) or Docker secrets
+  - Verify: `git log --all -p | grep -i "password" | head -5`
+  - Result: Should return nothing
 
-- [ ] SSL/TLS certificate is valid
-  - Domain: `worktimeapi.duckdns.org`
-  - Verify: `openssl s_client -connect worktimeapi.duckdns.org:443 -servername worktimeapi.duckdns.org 2>/dev/null | grep -A 5 "Verify return code"`
+- [ ] **Database connection uses SSL/TLS**
+  - `DATABASE_URL` includes `sslmode=require`
+  - Certificate is valid (not self-signed)
+  - Connection pool configured correctly
 
-- [ ] Certificate is not self-signed (for production)
-  - Verify: `openssl s_client -connect worktimeapi.duckdns.org:443 2>/dev/null | grep -i "self-signed"`
-  - Result: Should NOT contain "self-signed"
+- [ ] **Database user has minimal permissions**
+  - User: `worktime_user`
+  - Can only SELECT, INSERT, UPDATE, DELETE
+  - Cannot drop tables or databases
+  - Cannot create new users
 
-### Container Security
+### 4. JWT Secret Management
 
-- [ ] FastAPI container runs as non-root user
-  - Check: `docker inspect worktime-api | grep -i "user"`
+- [ ] **JWT_SECRET_KEY must be strong**
+  - Minimum 32 characters
+  - Mix of uppercase, lowercase, numbers, special chars
+  - Generated with: `openssl rand -hex 32`
+  - Example: `a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6`
 
-- [ ] Container has resource limits
-  - Memory limit: Set (e.g., 512MB)
-  - CPU limit: Set (e.g., 1 CPU)
-  - Check: `docker inspect worktime-api | grep -i "memory\|cpu"`
+- [ ] **JWT_SECRET_KEY is NOT committed to git**
+  ```bash
+  git log --all -p | grep -i "JWT_SECRET" | head -5
+  # Should return nothing
+  ```
 
-- [ ] Container logs are not exposed
-  - Logs stored in: `/opt/worktime-sync/logs/` with restricted permissions
-  - Check: `ls -l /opt/worktime-sync/logs/`
+- [ ] **JWT_SECRET_KEY is NOT in code**
+  - Default value in code is placeholder only
+  - Production value from environment variable
+  - `.env` file is in `.gitignore`
 
-### Network Security
+- [ ] **JWT algorithm is HS256 (not HS512 or others)**
+  - Check: `grep "JWT_ALGORITHM" docker-compose.yml`
+  - Value: `HS256`
 
-- [ ] Firewall rules restrict access
-  - Only allow HTTPS (443) from internet
-  - Allow SSH (22) from admin IPs only
-  - Check: `sudo ufw status` or `sudo iptables -L`
+### 5. CORS Configuration
 
-- [ ] Database is not exposed to internet
-  - PostgreSQL port (5432) only accessible from FastAPI container
-  - Check: `docker network inspect worktime-network` or `docker-compose ps`
+- [ ] **CORS allows ONLY mobile and web origins**
+  - Mobile app: `https://worktimeapp-pdfmhwoz.manus.space`
+  - Web admin (if exists): `https://admin.worktimeapi.duckdns.org`
+  - NO `allow_origins=["*"]`
+  - NO localhost in production
+  - Check: `grep -A 5 "allow_origins" app/main.py`
 
-- [ ] Admin endpoints are protected
-  - Require authentication
-  - Require admin role
-  - Check: `grep -B 5 "@router.post.*admin" /opt/worktime-sync/api/app/routers/admin.py`
+- [ ] **CORS credentials enabled only when needed**
+  - `allow_credentials=True` if using cookies
+  - `allow_credentials=False` if using Bearer tokens
 
----
+### 6. Rate Limiting
 
-## 🔍 Post-Deployment Security Verification
+- [ ] **Rate limiting on auth endpoints**
+  - `/api/v1/auth/register`: 5 requests per hour per IP
+  - `/api/v1/auth/login`: 10 requests per hour per IP
+  - `/api/v1/auth/refresh`: 30 requests per hour per IP
 
-### Test Authentication
+- [ ] **Rate limiting on admin endpoints**
+  - `/api/v1/admin/*`: 100 requests per hour per user
 
-```bash
-# Test registration
-curl -X POST https://worktimeapi.duckdns.org/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"login":"test","password":"Test1234!","passwordConfirm":"Test1234!","displayName":"Test","orgUnitId":1,"positionId":1}'
+- [ ] **Rate limiting on seed endpoint**
+  - `/api/v1/internal/seed-admins`: 1 request per minute per IP
 
-# Verify response does NOT contain token
-# Expected: {"ok":true,"status":"pending","message":"..."}
-# NOT: {"ok":true,"access_token":"..."}
-```
+### 7. No Secrets in Git
 
-### Test JWT Expiration
+- [ ] **Verify no secrets committed**
+  ```bash
+  git log --all -p | grep -E "(password|token|secret|key|JWT_SECRET|ADMIN_SEED)" | head -10
+  # Should return nothing
+  ```
 
-```bash
-# Get access token
-TOKEN=$(curl -s -X POST https://worktimeapi.duckdns.org/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"login":"admin","password":"password"}' | jq -r '.access_token')
+- [ ] **Verify .env is in .gitignore**
+  ```bash
+  cat .gitignore | grep ".env"
+  # Should contain .env
+  ```
 
-# Decode JWT to check expiration
-echo $TOKEN | cut -d'.' -f2 | base64 -d | jq '.exp'
+- [ ] **Verify no hardcoded credentials**
+  - All credentials from environment variables
+  - Default values are placeholders only
+  - Code review for hardcoded values
 
-# Verify expiration is ~30 minutes from now
-```
+### 8. No tempPassword in Logs
 
-### Test Audit Logging
+- [ ] **Temporary passwords NEVER logged**
+  - Audit logs exclude `tempPassword` field
+  - Application logs do NOT contain temp passwords
+  - Search logs:
+    ```bash
+    docker logs worktime-api | grep -i "password" | grep -i "temp"
+    # Should return nothing
+    ```
 
-```bash
-# Check audit logs were created
-docker exec worktime-postgres psql -U worktime_user -d worktime -c "SELECT action, created_at FROM audit_logs ORDER BY created_at DESC LIMIT 10;"
+- [ ] **Sensitive data NOT logged**
+  - Password hashes NOT logged
+  - JWT tokens NOT logged
+  - User credentials NOT logged
+  - API keys NOT logged
 
-# Verify no passwords are logged
-docker exec worktime-postgres psql -U worktime_user -d worktime -c "SELECT * FROM audit_logs WHERE action='user_login';" | grep -i "password"
-# Result: Should be empty
-```
+### 9. HTTPS Only
 
-### Test Rate Limiting
+- [ ] **HTTPS enforced in production**
+  - All endpoints require HTTPS
+  - HTTP redirects to HTTPS
+  - HSTS header set: `Strict-Transport-Security: max-age=31536000`
 
-```bash
-# Attempt multiple failed logins (should be rate limited)
-for i in {1..20}; do
-  curl -s -X POST https://worktimeapi.duckdns.org/api/v1/auth/login \
-    -H "Content-Type: application/json" \
-    -d '{"login":"test","password":"wrong"}' | jq '.status'
-done
+- [ ] **TLS certificate is valid**
+  - Not self-signed
+  - Not expired
+  - Matches domain name
+  - From trusted CA
 
-# Should see 429 Too Many Requests after threshold
-```
-
----
-
-## 📋 Security Incident Response
-
-### If Secrets Are Compromised
-
-1. **Immediately rotate JWT_SECRET_KEY:**
-   ```bash
-   # Generate new secret
-   NEW_SECRET=$(openssl rand -hex 32)
-   
-   # Update environment
-   # Edit docker-compose.yml or .env
-   # Set JWT_SECRET_KEY=$NEW_SECRET
-   
-   # Restart container
-   docker compose restart worktime-api
-   ```
-
-2. **Invalidate all existing tokens:**
-   ```bash
-   # Clear refresh_tokens table
-   docker exec worktime-postgres psql -U worktime_user -d worktime -c "DELETE FROM refresh_tokens;"
-   
-   # All users must re-login
-   ```
-
-3. **Audit logs for suspicious activity:**
-   ```bash
-   docker exec worktime-postgres psql -U worktime_user -d worktime -c "SELECT * FROM audit_logs WHERE created_at > NOW() - INTERVAL '1 hour' ORDER BY created_at DESC;"
-   ```
-
-### If Database Is Compromised
-
-1. **Restore from backup:**
-   ```bash
-   docker exec worktime-postgres psql -U worktime_user -d worktime < /backup/worktime_backup_YYYYMMDD_HHMMSS.sql
-   ```
-
-2. **Reset all passwords:**
-   ```bash
-   # Use admin endpoint to reset user passwords
-   # Users must change password on next login
-   ```
-
-3. **Rotate database credentials:**
-   ```bash
-   # Change worktime_user password
-   docker exec worktime-postgres psql -U postgres -c "ALTER USER worktime_user WITH PASSWORD 'new_secure_password';"
-   
-   # Update DATABASE_URL in environment
-   ```
+- [ ] **TLS version 1.2 or higher**
+  - Disable TLS 1.0 and 1.1
+  - Prefer TLS 1.3
 
 ---
 
-## ✅ Final Security Sign-Off
+## ✅ Pre-Deployment Checklist
 
-Before going to production:
+### Environment Variables
 
-- [ ] All items in this checklist are verified
-- [ ] Security team has reviewed the deployment
-- [ ] Incident response plan is documented
-- [ ] Backup and recovery procedures are tested
-- [ ] Monitoring and alerting are configured
-- [ ] Secrets are stored securely (not in git)
-- [ ] HTTPS certificate is valid and renewed automatically
-- [ ] Rate limiting is configured
-- [ ] Audit logging is working
-- [ ] Database backups are encrypted and tested
+- [ ] `JWT_SECRET_KEY` is set (32+ hex chars)
+- [ ] `ADMIN_SEED_TOKEN` is set (32+ hex chars)
+- [ ] `DATABASE_URL` has correct credentials
+- [ ] `ENABLE_ADMIN_SEED_ENDPOINT=true` (temporarily)
+- [ ] `JWT_ALGORITHM=HS256`
+- [ ] `ACCESS_TOKEN_EXPIRE_MINUTES=30`
+- [ ] `REFRESH_TOKEN_EXPIRE_DAYS=7`
+
+### Database
+
+- [ ] PostgreSQL is running
+- [ ] Database `worktime` exists
+- [ ] User `worktime_user` exists
+- [ ] SQL migration applied successfully
+- [ ] Tables created: `users`, `org_units`, `positions`, `audit_logs`, `refresh_tokens`
+
+### Code
+
+- [ ] No secrets in git history
+- [ ] No hardcoded credentials
+- [ ] Dependencies are up to date
+- [ ] Debug mode is disabled
+- [ ] CORS configured correctly
+
+### Testing
+
+- [ ] Health endpoint works
+- [ ] Public directories endpoints work
+- [ ] Registration works (returns pending status)
+- [ ] Admin seed endpoint works
+- [ ] Admin login works
+- [ ] User approval works
+- [ ] User login works (after approval)
+- [ ] Audit logs created
 
 ---
 
-**Last Updated:** July 9, 2026  
-**Status:** Ready for security review
+## 🚨 Post-Deployment Verification
+
+### Immediate After Deployment
+
+- [ ] **Verify HTTPS working**
+  ```bash
+  curl -I https://worktimeapi.duckdns.org/api/v1/health
+  # Should show 200 OK
+  ```
+
+- [ ] **Verify seed endpoint disabled**
+  ```bash
+  curl -X POST https://worktimeapi.duckdns.org/api/v1/internal/seed-admins \
+    -H "X-Admin-Token: any_token" \
+    -d '{"login":"test","password":"Test123!","displayName":"Test"}'
+  # Should return 403 Forbidden
+  ```
+
+- [ ] **Verify no secrets in logs**
+  ```bash
+  docker logs worktime-api | grep -i "secret\|password\|token" | head -5
+  # Should return nothing
+  ```
+
+- [ ] **Verify database connection encrypted**
+  ```bash
+  docker exec worktime-api env | grep DATABASE_URL
+  # Should show sslmode=require
+  ```
+
+### Weekly Security Checks
+
+- [ ] Review audit logs for suspicious activity
+- [ ] Check for failed login attempts
+- [ ] Verify no new admin users created unexpectedly
+- [ ] Verify all users have correct status
+
+### Monthly Security Audit
+
+- [ ] Review all API tokens
+- [ ] Check for exposed secrets
+- [ ] Verify TLS certificate expiration
+- [ ] Review CORS configuration
+- [ ] Check rate limiting effectiveness
+- [ ] Audit user access patterns
+- [ ] Clean up old logs
+
+---
+
+## 📞 Security Incident Response
+
+### If Secrets Are Exposed
+
+1. Immediately rotate all secrets
+2. Update all services with new secrets
+3. Restart all containers
+4. Invalidate all existing tokens
+5. Notify all users to re-login
+6. Review audit logs for unauthorized access
+
+### If Unauthorized Access Detected
+
+1. Block suspicious user
+2. Invalidate user tokens
+3. Review audit logs
+4. Notify security team
+
+---
+
+## ✅ Final Sign-Off
+
+- [ ] All critical requirements verified
+- [ ] All pre-deployment checks passed
+- [ ] All post-deployment verification passed
+- [ ] Incident response plan documented
+- [ ] Security team approved
+- [ ] Ready for production
+
+**Deployment Date:** ___________________  
+**Approved by:** ___________________  
+**Status:** ☐ Approved ☐ Approved with conditions ☐ Rejected
+
+---
+
+**Last Updated:** July 10, 2026  
+**Status:** Ready for deployment
