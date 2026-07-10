@@ -154,7 +154,7 @@ export default function HomeScreen() {
         {workDay && workDay.events.length === 0 && (
           <View className="items-center justify-center py-12">
             <Text className="text-muted text-center">
-              Нажмите "Начать работу" чтобы начать отслеживание времени
+              Нажмите &quot;Начать работу&quot; чтобы начать отслеживание времени
             </Text>
           </View>
         )}
