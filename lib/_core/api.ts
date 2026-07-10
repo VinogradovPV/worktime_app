@@ -7,22 +7,29 @@ type ApiResponse<T> = {
   error?: string;
 };
 
+type ApiCallOptions = RequestInit & {
+  auth?: boolean;
+};
+
 /**
  * Основной метод для API запросов
  * 
  * ВАЖНО: Не использует hardcoded токены.
  * Токен берется из Auth.getSessionToken() после login.
  */
-export async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export async function apiCall<T>(endpoint: string, options: ApiCallOptions = {}): Promise<T> {
+  const { auth = true, ...requestOptions } = options;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...((options.headers as Record<string, string>) || {}),
+    ...((requestOptions.headers as Record<string, string>) || {}),
   };
 
   // Добавить Authorization заголовок, если есть сохраненный токен
-  const sessionToken = await Auth.getSessionToken();
-  if (sessionToken) {
-    headers["Authorization"] = `Bearer ${sessionToken}`;
+  if (auth) {
+    const sessionToken = await Auth.getSessionToken();
+    if (sessionToken) {
+      headers["Authorization"] = `Bearer ${sessionToken}`;
+    }
   }
 
   const baseUrl = getApiBaseUrl();
@@ -34,7 +41,7 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
 
   try {
     const response = await fetch(url, {
-      ...options,
+      ...requestOptions,
       headers,
       credentials: "include",
     });
@@ -93,6 +100,7 @@ export async function register(data: {
   comment?: string;
 }): Promise<{ ok: boolean; status: string; message: string }> {
   return apiCall(API_ENDPOINTS.AUTH.REGISTER, {
+    auth: false,
     method: "POST",
     body: JSON.stringify(data),
   });
@@ -121,6 +129,7 @@ export async function login(
     requiresPasswordChange?: boolean;
     user: any;
   }>(API_ENDPOINTS.AUTH.LOGIN, {
+    auth: false,
     method: "POST",
     body: JSON.stringify({ login, password }),
   });
@@ -151,6 +160,7 @@ export async function refresh(refreshToken: string): Promise<{
     access_token: string;
     refresh_token: string;
   }>(API_ENDPOINTS.AUTH.REFRESH, {
+    auth: false,
     method: "POST",
     body: JSON.stringify({ refresh_token: refreshToken }),
   });
@@ -344,7 +354,7 @@ export async function getOrgUnits(): Promise<{
   orgUnits: any[];
   total: number;
 }> {
-  return apiCall(API_ENDPOINTS.DIRECTORIES.ORG_UNITS);
+  return apiCall(API_ENDPOINTS.DIRECTORIES.ORG_UNITS, { auth: false });
 }
 
 /**
@@ -370,7 +380,7 @@ export async function getPositions(): Promise<{
   positions: any[];
   total: number;
 }> {
-  return apiCall(API_ENDPOINTS.DIRECTORIES.POSITIONS);
+  return apiCall(API_ENDPOINTS.DIRECTORIES.POSITIONS, { auth: false });
 }
 
 /**
