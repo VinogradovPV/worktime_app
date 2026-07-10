@@ -34,7 +34,7 @@ const jsonResponse = (data: unknown) =>
     },
     json: async () => data,
     text: async () => JSON.stringify(data),
-  }) as Response;
+  }) as unknown as Response;
 
 describe('API configuration and authentication', () => {
   beforeEach(() => {
