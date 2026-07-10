@@ -20,6 +20,9 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      EXPO_PUBLIC_API_BASE_URL: https://worktimeapi.duckdns.org
+      EXPO_PUBLIC_API_TOKEN: 0000000000000000000000000000000000000000
 
     steps:
       - name: Checkout
