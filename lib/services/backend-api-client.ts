@@ -2,12 +2,12 @@
  * Backend API Client
  * Клиент для взаимодействия с backend API сервером
  * 
- * Использует переменные окружения:
- * - EXPO_PUBLIC_API_BASE_URL: базовый URL API
- * - EXPO_PUBLIC_API_TOKEN: токен аутентификации
+ * Uses the shared API base URL and the user's session token after login.
  */
 
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
+import * as Auth from '@/lib/_core/auth';
+import { getApiBaseUrl } from '@/lib/_core/api-config';
 
 interface ApiResponse<T = any> {
   success: boolean;
@@ -26,19 +26,9 @@ interface ApiErrorResponse {
 class BackendApiClient {
   private axiosInstance: AxiosInstance;
   private baseUrl: string;
-  private apiToken: string;
 
   constructor() {
-    this.baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || '';
-    this.apiToken = (process.env.EXPO_PUBLIC_API_TOKEN || '').replace(/\s/g, '');
-
-    if (!this.baseUrl) {
-      throw new Error('EXPO_PUBLIC_API_BASE_URL is not set');
-    }
-
-    if (!this.apiToken) {
-      throw new Error('EXPO_PUBLIC_API_TOKEN is not set');
-    }
+    this.baseUrl = getApiBaseUrl();
 
     this.axiosInstance = axios.create({
       baseURL: this.baseUrl,
@@ -46,8 +36,19 @@ class BackendApiClient {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': `Bearer ${this.apiToken}`,
       },
+    });
+
+    this.axiosInstance.interceptors.request.use(async (config) => {
+      const sessionToken = await Auth.getSessionToken();
+      if (sessionToken) {
+        if (typeof config.headers.set === 'function') {
+          config.headers.set('Authorization', `Bearer ${sessionToken}`);
+        } else {
+          (config.headers as Record<string, string>).Authorization = `Bearer ${sessionToken}`;
+        }
+      }
+      return config;
     });
 
     // Добавляем интерцептор для логирования ошибок
@@ -142,7 +143,7 @@ class BackendApiClient {
       const data = error.response?.data as ApiErrorResponse | undefined;
 
       if (status === 401) {
-        throw new Error('Unauthorized: Invalid API token');
+        throw new Error('Unauthorized: Invalid session token');
       }
 
       if (status === 403) {

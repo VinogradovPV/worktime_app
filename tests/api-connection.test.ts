@@ -1,60 +1,121 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getApiBaseUrl } from '@/lib/_core/api-config';
+import {
+  apiCall,
+  changePassword,
+  getOrgUnits,
+  getPositions,
+  login,
+  register,
+} from '@/lib/_core/api';
+import * as Auth from '@/lib/_core/auth';
 
-/**
- * Тест для проверки подключения к backend API
- * Проверяет, что переменные окружения установлены и API доступен
- */
-describe('Backend API Connection', () => {
-  let apiBaseUrl: string;
-  let apiToken: string;
+vi.mock('@/lib/_core/auth', () => ({
+  getSessionToken: vi.fn(),
+  setSessionToken: vi.fn(),
+  setRefreshToken: vi.fn(),
+}));
 
-  beforeAll(() => {
-    apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || '';
-    apiToken = process.env.EXPO_PUBLIC_API_TOKEN || '';
+vi.mock('expo-constants', () => ({
+  default: {
+    expoConfig: {
+      extra: {},
+    },
+  },
+}));
+
+const jsonResponse = (data: unknown) =>
+  ({
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    headers: {
+      get: () => 'application/json',
+    },
+    json: async () => data,
+    text: async () => JSON.stringify(data),
+  }) as unknown as Response;
+
+describe('API configuration and authentication', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ ok: true })));
+    delete process.env.EXPO_PUBLIC_API_BASE_URL;
   });
 
-  it('should have API_BASE_URL environment variable set', () => {
-    expect(apiBaseUrl).toBeTruthy();
-    expect(apiBaseUrl).toBe('https://worktimeapi.duckdns.org');
+  it('uses the configured API base URL', () => {
+    process.env.EXPO_PUBLIC_API_BASE_URL = 'https://example.invalid';
+
+    expect(getApiBaseUrl()).toBe('https://example.invalid');
   });
 
-  it('should have API_TOKEN environment variable set', () => {
-    expect(apiToken).toBeTruthy();
-    expect(apiToken.length).toBeGreaterThan(0);
+  it('uses the production fallback when no API base URL is configured', () => {
+    expect(getApiBaseUrl()).toBe('https://worktimeapi.duckdns.org');
   });
 
-  it('should have valid API token format', () => {
-    // Токен должен быть строкой из hex символов
-    const cleanToken = apiToken.replace(/\s/g, '');
-    expect(cleanToken).toMatch(/^[a-f0-9]+$/i);
-    expect(cleanToken.length).toBeGreaterThan(32);
+  it('does not add Authorization for register, login, or public directories', async () => {
+    vi.mocked(Auth.getSessionToken).mockResolvedValue('user-session-token');
+
+    await register({
+      login: 'new-user',
+      password: 'password',
+      passwordConfirm: 'password',
+      displayName: 'New User',
+      orgUnitId: 1,
+      positionId: 2,
+    });
+    await login('new-user', 'password');
+    await getOrgUnits();
+    await getPositions();
+
+    const fetchMock = vi.mocked(fetch);
+    for (const call of fetchMock.mock.calls) {
+      const headers = call[1]?.headers as Record<string, string>;
+      expect(headers.Authorization).toBeUndefined();
+    }
   });
 
-  it('should be able to construct API headers', () => {
-    const cleanToken = apiToken.replace(/\s/g, '');
-    const headers = {
-      'Authorization': `Bearer ${cleanToken}`,
-      'Content-Type': 'application/json',
-    };
+  it('does not create Authorization when no session token exists', async () => {
+    vi.mocked(Auth.getSessionToken).mockResolvedValue(null);
 
-    expect(headers['Authorization']).toBe('Bearer ' + cleanToken);
-    expect(headers['Content-Type']).toBe('application/json');
+    await apiCall('/api/v1/protected');
+
+    const headers = vi.mocked(fetch).mock.calls[0][1]?.headers as Record<string, string>;
+    expect(headers.Authorization).toBeUndefined();
   });
 
-  it('should have valid base URL format', () => {
-    expect(apiBaseUrl).toMatch(/^https?:\/\/.+/);
+  it('adds Authorization only from the user session token for protected calls', async () => {
+    vi.mocked(Auth.getSessionToken).mockResolvedValue('user-session-token');
+
+    await apiCall('/api/v1/protected');
+
+    const headers = vi.mocked(fetch).mock.calls[0][1]?.headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer user-session-token');
   });
 
-  it('should be able to make API requests with proper headers', async () => {
-    const cleanToken = apiToken.replace(/\s/g, '');
-    const headers = {
-      'Authorization': `Bearer ${cleanToken}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    };
+  it('does not log the user session token while building protected calls', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.mocked(Auth.getSessionToken).mockResolvedValue('sensitive-user-token');
 
-    expect(headers['Authorization']).toBeTruthy();
-    expect(headers['Authorization']).toContain('Bearer');
-    expect(headers['Content-Type']).toBe('application/json');
+    await apiCall('/api/v1/protected');
+
+    const messages = [...logSpy.mock.calls, ...errorSpy.mock.calls].flat().join(' ');
+    expect(messages).not.toContain('sensitive-user-token');
+
+    logSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('sends snake_case payload when changing password', async () => {
+    vi.mocked(Auth.getSessionToken).mockResolvedValue('user-session-token');
+
+    await changePassword('old-password', 'new-password');
+
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]?.body as string);
+    expect(body).toEqual({
+      current_password: 'old-password',
+      new_password: 'new-password',
+    });
   });
 });

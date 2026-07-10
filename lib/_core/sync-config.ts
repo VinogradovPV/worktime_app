@@ -3,6 +3,8 @@
  */
 
 import { SyncConfig } from '@/shared/types/sync';
+import * as Auth from '@/lib/_core/auth';
+import { getApiBaseUrl as getCoreApiBaseUrl } from '@/lib/_core/api-config';
 
 /**
  * Получить базовый URL API
@@ -11,19 +13,15 @@ import { SyncConfig } from '@/shared/types/sync';
 export function getApiBaseUrl(): string {
   // В production это должно быть из .env
   // Для разработки используем localhost
-  if (process.env.NODE_ENV === 'development') {
-    return process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000';
-  }
-
-  return process.env.EXPO_PUBLIC_API_BASE_URL || 'https://api.example.com';
+  return getCoreApiBaseUrl();
 }
 
 /**
  * Получить токен авторизации
  */
-export function getAuthToken(): string {
+export async function getAuthToken(): Promise<string | null> {
   // TODO: Получить из SecureStore после реализации авторизации
-  return process.env.EXPO_PUBLIC_API_TOKEN || '';
+  return Auth.getSessionToken();
 }
 
 /**
@@ -69,7 +67,7 @@ export const apiEndpoints = {
 /**
  * HTTP headers для API запросов
  */
-export function getApiHeaders(includeAuth: boolean = true): Record<string, string> {
+export async function getApiHeaders(includeAuth: boolean = true): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -77,7 +75,7 @@ export function getApiHeaders(includeAuth: boolean = true): Record<string, strin
   };
 
   if (includeAuth) {
-    const token = getAuthToken();
+    const token = await getAuthToken();
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }

@@ -281,7 +281,7 @@ export class SyncService {
    */
   private async sendRequest(payload: any): Promise<SyncResponse | null> {
     const url = buildApiUrl(apiEndpoints.syncEvents);
-    const headers = getApiHeaders(true);
+    const headers = await getApiHeaders(true);
 
     try {
       const response = await fetch(url, {

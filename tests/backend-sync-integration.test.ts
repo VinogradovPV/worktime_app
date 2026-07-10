@@ -1,126 +1,149 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getApiHeaders, getSyncConfig } from '@/lib/_core/sync-config';
+import { getBackendApiClient } from '@/lib/services/backend-api-client';
+import { createBackendSyncIntegration } from '@/lib/services/backend-sync-integration';
+import * as Auth from '@/lib/_core/auth';
+import axios from 'axios';
 
-/**
- * Тест для проверки интеграции backend синхронизации
- * Проверяет наличие необходимых переменных окружения и конфигурации
- */
-describe('Backend Sync Integration', () => {
-  describe('Environment Configuration', () => {
-    it('should have EXPO_PUBLIC_API_BASE_URL set', () => {
-      expect(process.env.EXPO_PUBLIC_API_BASE_URL).toBeTruthy();
-    });
+const integrationMocks = vi.hoisted(() => ({
+  workDaySync: {
+    setUserId: vi.fn(),
+    syncWorkDay: vi.fn(),
+    fetchWorkDay: vi.fn(),
+  },
+  profileSync: {
+    setUserId: vi.fn(),
+    syncUserProfile: vi.fn(),
+    fetchUserProfile: vi.fn(),
+  },
+  notifications: {
+    notifySyncError: vi.fn(),
+  },
+}));
 
-    it('should have EXPO_PUBLIC_API_TOKEN set', () => {
-      expect(process.env.EXPO_PUBLIC_API_TOKEN).toBeTruthy();
-    });
+vi.mock('@/lib/_core/auth', () => ({
+  getSessionToken: vi.fn(),
+}));
 
-    it('should have correct API base URL', () => {
-      const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-      expect(baseUrl).toBe('https://worktimeapi.duckdns.org');
-    });
+vi.mock('@/lib/services/workday-sync-service', () => ({
+  getWorkDaySyncService: vi.fn(() => integrationMocks.workDaySync),
+}));
 
-    it('should have valid API base URL format', () => {
-      const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-      expect(baseUrl).toMatch(/^https?:\/\/.+/);
-    });
+vi.mock('@/lib/services/user-profile-sync-service', () => ({
+  getUserProfileSyncService: vi.fn(() => integrationMocks.profileSync),
+}));
 
-    it('should have valid API token format', () => {
-      const token = process.env.EXPO_PUBLIC_API_TOKEN;
-      const cleanToken = token?.replace(/\s/g, '') || '';
-      expect(cleanToken).toMatch(/^[a-f0-9]+$/i);
-      expect(cleanToken.length).toBeGreaterThan(32);
-    });
+vi.mock('@/lib/services/sync-notifications', () => ({
+  getSyncNotificationsService: vi.fn(() => integrationMocks.notifications),
+}));
+
+vi.mock('@/lib/storage/workdayService', () => ({
+  getTodayWorkDay: vi.fn(),
+}));
+
+vi.mock('@/lib/utils/dateUtils', () => ({
+  formatDate: vi.fn(() => '2026-01-01'),
+}));
+
+vi.mock('expo-constants', () => ({
+  default: {
+    expoConfig: {
+      extra: {},
+    },
+  },
+}));
+
+vi.mock('axios', () => {
+  const interceptors = {
+    request: {
+      use: vi.fn(),
+    },
+    response: {
+      use: vi.fn(),
+    },
+  };
+
+  return {
+    default: {
+      create: vi.fn(() => ({
+        defaults: {},
+        interceptors,
+        get: vi.fn(),
+        post: vi.fn(),
+        put: vi.fn(),
+        delete: vi.fn(),
+      })),
+      isAxiosError: vi.fn(),
+    },
+  };
+});
+
+describe('Backend sync API configuration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.EXPO_PUBLIC_API_BASE_URL;
   });
 
-  describe('Backend Services Architecture', () => {
-    it('should have backend API client service', () => {
-      // Проверяем, что сервис может быть импортирован
-      expect(true).toBe(true);
-    });
+  it('builds sync config from the shared API base URL fallback', () => {
+    const config = getSyncConfig();
 
-    it('should have workday sync service', () => {
-      // Проверяем, что сервис может быть импортирован
-      expect(true).toBe(true);
-    });
-
-    it('should have user profile sync service', () => {
-      // Проверяем, что сервис может быть импортирован
-      expect(true).toBe(true);
-    });
-
-    it('should have calendar sync service', () => {
-      // Проверяем, что сервис может быть импортирован
-      expect(true).toBe(true);
-    });
-
-    it('should have backend sync integration service', () => {
-      // Проверяем, что сервис может быть импортирован
-      expect(true).toBe(true);
-    });
+    expect(config.api_base_url).toBe('https://worktimeapi.duckdns.org');
+    expect(config.auto_sync_enabled).toBe(true);
+    expect(config.batch_size).toBeGreaterThan(0);
   });
 
-  describe('API Connection Requirements', () => {
-    it('should have all required environment variables for API connection', () => {
-      const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-      const token = process.env.EXPO_PUBLIC_API_TOKEN;
+  it('builds sync config from a configured mock API URL', () => {
+    process.env.EXPO_PUBLIC_API_BASE_URL = 'https://example.invalid';
 
-      expect(baseUrl).toBeTruthy();
-      expect(token).toBeTruthy();
-      expect(baseUrl).toContain('worktimeapi');
-      expect(token?.length).toBeGreaterThan(0);
-    });
-
-    it('should support Bearer token authentication', () => {
-      const token = process.env.EXPO_PUBLIC_API_TOKEN;
-      const cleanToken = token?.replace(/\s/g, '') || '';
-      const authHeader = `Bearer ${cleanToken}`;
-
-      expect(authHeader).toContain('Bearer');
-      expect(authHeader.length).toBeGreaterThan(10);
-    });
-
-    it('should have HTTPS protocol for secure connection', () => {
-      const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-      expect(baseUrl).toMatch(/^https:\/\//);
-    });
+    expect(getSyncConfig().api_base_url).toBe('https://example.invalid');
   });
 
-  describe('Sync Services Configuration', () => {
-    it('should support workday synchronization', () => {
-      // Конфигурация для синхронизации рабочих дней
-      const config = {
-        userId: 'test_user',
-        autoSync: true,
-        syncInterval: 10 * 60 * 1000, // 10 minutes
-      };
+  it('does not add Authorization when no user session token exists', async () => {
+    vi.mocked(Auth.getSessionToken).mockResolvedValue(null);
 
-      expect(config.userId).toBeTruthy();
-      expect(config.autoSync).toBe(true);
-      expect(config.syncInterval).toBeGreaterThan(0);
+    const headers = await getApiHeaders(true);
+
+    expect(headers.Authorization).toBeUndefined();
+  });
+
+  it('adds Authorization from the user session token for sync headers', async () => {
+    vi.mocked(Auth.getSessionToken).mockResolvedValue('sync-user-token');
+
+    const headers = await getApiHeaders(true);
+
+    expect(headers.Authorization).toBe('Bearer sync-user-token');
+  });
+
+  it('creates backend API client without a public API token and uses the session interceptor', async () => {
+    getBackendApiClient();
+
+    expect(axios.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseURL: 'https://worktimeapi.duckdns.org',
+        headers: expect.not.objectContaining({
+          Authorization: expect.any(String),
+        }),
+      }),
+    );
+    vi.mocked(Auth.getSessionToken).mockResolvedValue('backend-session-token');
+
+    const createdClient = vi.mocked(axios.create).mock.results[0].value;
+    const interceptor = createdClient.interceptors.request.use.mock.calls[0][0];
+    const config = await interceptor({ headers: {} });
+
+    expect(config.headers.Authorization).toBe('Bearer backend-session-token');
+  });
+
+  it('creates backend sync integration with meaningful service methods', () => {
+    const integration = createBackendSyncIntegration({
+      userId: 'test-user',
+      autoSync: false,
+      syncInterval: 60000,
     });
 
-    it('should support profile synchronization', () => {
-      // Конфигурация для синхронизации профиля
-      const config = {
-        userId: 'test_user',
-        autoSync: true,
-        syncInterval: 10 * 60 * 1000,
-      };
-
-      expect(config.userId).toBeTruthy();
-      expect(config.autoSync).toBe(true);
-    });
-
-    it('should support calendar synchronization', () => {
-      // Конфигурация для синхронизации календаря
-      const config = {
-        userId: 'test_user',
-        autoSync: true,
-        syncInterval: 10 * 60 * 1000,
-      };
-
-      expect(config.userId).toBeTruthy();
-      expect(config.autoSync).toBe(true);
-    });
+    expect(typeof integration.initialize).toBe('function');
+    expect(typeof integration.syncTodayWorkDay).toBe('function');
+    expect(typeof integration.syncUserProfile).toBe('function');
+    expect(typeof integration.fullSync).toBe('function');
   });
 });
