@@ -5,8 +5,44 @@ import { createBackendSyncIntegration } from '@/lib/services/backend-sync-integr
 import * as Auth from '@/lib/_core/auth';
 import axios from 'axios';
 
+const integrationMocks = vi.hoisted(() => ({
+  workDaySync: {
+    setUserId: vi.fn(),
+    syncWorkDay: vi.fn(),
+    fetchWorkDay: vi.fn(),
+  },
+  profileSync: {
+    setUserId: vi.fn(),
+    syncUserProfile: vi.fn(),
+    fetchUserProfile: vi.fn(),
+  },
+  notifications: {
+    notifySyncError: vi.fn(),
+  },
+}));
+
 vi.mock('@/lib/_core/auth', () => ({
   getSessionToken: vi.fn(),
+}));
+
+vi.mock('@/lib/services/workday-sync-service', () => ({
+  getWorkDaySyncService: vi.fn(() => integrationMocks.workDaySync),
+}));
+
+vi.mock('@/lib/services/user-profile-sync-service', () => ({
+  getUserProfileSyncService: vi.fn(() => integrationMocks.profileSync),
+}));
+
+vi.mock('@/lib/services/sync-notifications', () => ({
+  getSyncNotificationsService: vi.fn(() => integrationMocks.notifications),
+}));
+
+vi.mock('@/lib/storage/workdayService', () => ({
+  getTodayWorkDay: vi.fn(),
+}));
+
+vi.mock('@/lib/utils/dateUtils', () => ({
+  formatDate: vi.fn(() => '2026-01-01'),
 }));
 
 vi.mock('expo-constants', () => ({
