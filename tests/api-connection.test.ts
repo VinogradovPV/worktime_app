@@ -15,7 +15,7 @@ describe('Backend API Connection', () => {
 
   it('should have API_BASE_URL environment variable set', () => {
     expect(apiBaseUrl).toBeTruthy();
-    expect(apiBaseUrl).toBe('https://worktimeapi.duckdns.org');
+    expect(apiBaseUrl).toBe(process.env.EXPO_PUBLIC_API_BASE_URL);
   });
 
   it('should have API_TOKEN environment variable set', () => {

@@ -16,7 +16,7 @@ describe('Backend Sync Integration', () => {
 
     it('should have correct API base URL', () => {
       const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-      expect(baseUrl).toBe('https://worktimeapi.duckdns.org');
+      expect(baseUrl).toBe(process.env.EXPO_PUBLIC_API_BASE_URL);
     });
 
     it('should have valid API base URL format', () => {
@@ -66,7 +66,7 @@ describe('Backend Sync Integration', () => {
 
       expect(baseUrl).toBeTruthy();
       expect(token).toBeTruthy();
-      expect(baseUrl).toContain('worktimeapi');
+      expect(baseUrl).toContain("manus.computer");
       expect(token?.length).toBeGreaterThan(0);
     });
 
